@@ -1,0 +1,28 @@
+# Dev mode toggle
+.dev
+
+# Dependencies
+/node_modules/
+/frontend/node_modules/
+
+# Build artifacts
+/assets/build/
+
+# Editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Context folder (local reference only)
+/assets/
+/builds/
+
+
+
