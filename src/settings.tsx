@@ -102,7 +102,7 @@ function SettingsUI({
   React.useEffect(() => {
     const onSubmit = () => {
       try {
-        sessionStorage.setItem('abi_toast_after', 'settings_saved');
+        sessionStorage.setItem('acfoi_toast_after', 'settings_saved');
       } catch {}
     };
     form.addEventListener('submit', onSubmit);
@@ -116,36 +116,38 @@ function SettingsUI({
     const purged = url.searchParams.get('purged');
     const restored = url.searchParams.get('restored');
 
-    console.log('[ABI Settings] URL params:', {
-      settingsSaved,
-      purged,
-      restored,
-    });
-
     // SessionStorage fallback when WP doesn't append query params
     let ss = '';
     try {
-      ss = sessionStorage.getItem('abi_toast_after') || '';
-      if (ss) sessionStorage.removeItem('abi_toast_after');
+      ss = sessionStorage.getItem('acfoi_toast_after') || '';
+      if (ss) sessionStorage.removeItem('acfoi_toast_after');
     } catch {}
 
     if (settingsSaved) {
-      console.log('[ABI Settings] Triggering toast for settings saved');
-      push({ type: 'success', title: 'Saved', message: 'Settings updated.' });
+      push({
+        type: 'success',
+        title: 'Saved',
+        message: 'Settings updated.',
+      });
       url.searchParams.delete('settings-updated');
       window.history.replaceState({}, '', url.toString());
     } else if (ss === 'settings_saved') {
-      console.log('[ABI Settings] Triggering toast via sessionStorage (saved)');
-      push({ type: 'success', title: 'Saved', message: 'Settings updated.' });
+      push({
+        type: 'success',
+        title: 'Saved',
+        message: 'Settings updated.',
+      });
     }
     if (purged) {
-      console.log('[ABI Settings] Triggering toast for cache purged');
-      push({ type: 'success', title: 'Cache', message: 'Icon cache purged.' });
+      push({
+        type: 'success',
+        title: 'Cache',
+        message: 'Icon cache purged.',
+      });
       url.searchParams.delete('purged');
       window.history.replaceState({}, '', url.toString());
     }
     if (restored) {
-      console.log('[ABI Settings] Triggering toast for defaults restored');
       push({
         type: 'success',
         title: 'Restored',
@@ -153,14 +155,17 @@ function SettingsUI({
       });
       url.searchParams.delete('restored');
       window.history.replaceState({}, '', url.toString());
-      window.location.reload();
+      // Delay reload so toast is visible
+      setTimeout(() => {
+        window.location.reload();
+      }, 2500);
     }
   }, [push]);
 
   const controlClass = 'max-w-[520px]';
 
   return (
-    <div className='abi-settings-ui mt-3'>
+    <div className='acfoi-settings-ui mt-3'>
       <div ref={toastRef} />
       {portal}
       <div className='space-y-6 max-w-[576px]'>
@@ -179,7 +184,7 @@ function SettingsUI({
         </div>
 
         <div className='rounded-md border bg-white p-4'>
-          <Label className='block mb-3'>Palette colours</Label>
+          <Label className='block mb-3'>Palette colors</Label>
           <div className='grid gap-3'>
             <div className='grid grid-cols-[180px_1fr_80px] items-center gap-3'>
               <span className='text-sm text-muted-foreground'>Token A</span>
@@ -245,7 +250,7 @@ function SettingsUI({
             onClick={() => {
               const restoreForm = document
                 .querySelector(
-                  'form input[name="action"][value="abi_restore_defaults"]'
+                  'form input[name="action"][value="acfoi_restore_defaults"]'
                 )
                 ?.closest('form') as HTMLFormElement | null;
               if (restoreForm) restoreForm.requestSubmit();
@@ -270,7 +275,7 @@ function mount() {
   if (!form) return;
   const table = form.querySelector('table.form-table') as HTMLElement | null;
   if (table) table.style.display = 'none';
-  const existing = wrap.querySelector('.abi-settings-ui');
+  const existing = wrap.querySelector('.acfoi-settings-ui');
   if (existing) return; // avoid duplicates
   const mount = document.createElement('div');
   wrap.insertBefore(mount, form);

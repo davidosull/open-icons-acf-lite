@@ -42,11 +42,12 @@ export function DialogContent({
       />
       <div
         className={cn(
-          'fixed left-1/2 top-1/2 z-[100001] w-full max-w-[760px] -translate-x-1/2 -translate-y-1/2 rounded border bg-white p-4 shadow',
+          'fixed left-1/2 top-1/2 z-[100001] w-full max-w-[760px] -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-white p-6 shadow-xl',
           className
         )}
         role='dialog'
         aria-modal='true'
+        onClick={(e) => e.stopPropagation()}
       >
         {children}
       </div>

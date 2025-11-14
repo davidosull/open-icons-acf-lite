@@ -3,47 +3,100 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import IconPicker from './components/IconPicker';
 
-console.log('[ACFOI] Script loaded - V2');
-
 function mountPickers() {
-  console.log('[ACFOI] Mounting pickers…');
   const fields = document.querySelectorAll(
-    '.abi-field:not([data-abi-mounted])'
+    '.acfoi-field:not([data-acfoi-mounted])'
   );
-  console.log('[ACFOI] Found fields:', fields.length);
+
+  // Simple registry to manage React roots per instance
+  const registry: Record<string, { root: any; mount: HTMLElement }> = ((
+    window as any
+  ).__ACFOI_REGISTRY__ = (window as any).__ACFOI_REGISTRY__ || {});
 
   fields.forEach((el) => {
     const host = el as HTMLElement;
-    host.dataset.abiMounted = '1';
 
-    const provider = host.dataset.abiProvider || 'lucide';
-    const version = host.dataset.abiVersion || 'latest';
+    const keyOut = host.querySelector(
+      '[data-acfoi-key-out]'
+    ) as HTMLInputElement | null;
+    const isClone = !!host.closest('.acf-clone');
+    const isHiddenTpl =
+      host.style.display === 'none' &&
+      host.closest('[data-type]')?.classList.contains('acf-field');
+    const hasCloneIndex = !!keyOut?.name?.includes('acfcloneindex');
 
-    console.log('[ACFOI] Mounting field:', host.id, 'provider:', provider);
+    // Skip template elements (ACF uses these for cloning)
+    if (isClone || isHiddenTpl) {
+      return;
+    }
 
-    const preview = host.querySelector('[data-abi-preview]') as HTMLElement;
+    // Skip if field hasn't been finalized (still has acfcloneindex)
+    // ACF replaces acfcloneindex with actual indices when field is ready
+    if (hasCloneIndex) {
+      return; // Skip - field not finalized yet
+    }
+
+    // Ensure finalized fields have a unique instanceId and id (clones can duplicate IDs)
+    let instanceId = host.dataset.acfoiInstanceId || host.id || '';
+    const keyOutForId = host.querySelector(
+      '[data-acfoi-key-out]'
+    ) as HTMLInputElement | null;
+    const stillCloneIndex = !!keyOutForId?.name?.includes('acfcloneindex');
+    const idConflict =
+      instanceId &&
+      document.querySelectorAll(
+        `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
+      ).length > 1;
+    if (!instanceId || idConflict || stillCloneIndex) {
+      const newId = `acfoi_${Date.now().toString(16)}_${Math.random()
+        .toString(36)
+        .slice(2)}`;
+      host.id = newId;
+      host.dataset.acfoiInstanceId = newId;
+      instanceId = newId;
+    }
+
+    host.dataset.acfoiMounted = '1';
+
+    // CRITICAL: Check if we already have a React root for this instance ID
+    // Properly unmount any existing root before creating a new one
+    const existing = registry[instanceId];
+    const existingMountId = `acfoi-mount-${instanceId}`;
+    if (existing) {
+      try {
+        existing.root.unmount?.();
+      } catch {}
+      try {
+        existing.mount.remove();
+      } catch {}
+      delete registry[instanceId];
+    } else {
+      const stray = document.getElementById(existingMountId);
+      if (stray) {
+        stray.remove();
+      }
+    }
+
+    const provider = host.dataset.acfoiProvider || 'lucide';
+    const version = host.dataset.acfoiVersion || 'latest';
+    const useLastColor = host.dataset.acfoiUseLastColor === '1';
+    const fieldKey = host.dataset.acfoiFieldKey || '';
+    const fieldGroupKey = host.dataset.acfoiFieldGroupKey || '';
+
+    const preview = host.querySelector('[data-acfoi-preview]') as HTMLElement;
     const inputKey = host.querySelector(
-      '[data-abi-key-out]'
+      '[data-acfoi-key-out]'
     ) as HTMLInputElement;
     const inputSvg = host.querySelector(
-      '[data-abi-svg-out]'
+      '[data-acfoi-svg-out]'
     ) as HTMLTextAreaElement;
-    const openBtn = host.querySelector('[data-abi-open]') as HTMLButtonElement;
+    const openBtn = host.querySelector(
+      '[data-acfoi-open]'
+    ) as HTMLButtonElement;
 
-    console.log('[ACFOI] Found elements:', {
-      preview: !!preview,
-      inputKey: !!inputKey,
-      inputSvg: !!inputSvg,
-      openBtn: !!openBtn,
-    });
-
-    // Initial common list is embedded server-side on window
-    const initialCommon: string[] = (window as any).__ACFOI_COMMON__ || [];
-    console.log('[ACFOI] Common icons:', initialCommon.length);
-
-    // Create a mount point for the React modal
+    // Create a mount point for the React modal - use instance ID for consistency
     const mount = document.createElement('div');
-    mount.id = `abi-mount-${host.id || Math.random().toString(36).slice(2)}`;
+    mount.id = existingMountId;
     document.body.appendChild(mount);
 
     // Create the React root once per field
@@ -53,86 +106,181 @@ function mountPickers() {
       <IconPicker
         provider={provider}
         version={version}
-        initialCommon={initialCommon}
+        instanceId={instanceId}
+        useLastColor={useLastColor}
+        fieldKey={fieldKey}
+        fieldGroupKey={fieldGroupKey}
         onSelect={(item: {
           key: string;
           svg?: string;
-          colour?: { token: string; hex: string };
+          color?: { token: string; hex: string };
         }) => {
-          console.log(
-            '[ACFOI] Icon selected:',
-            item.key,
-            'colour:',
-            item.colour
-          );
-          if (inputKey) inputKey.value = item.key;
-          if (inputSvg && item.svg) {
-            // Apply colour to SVG before storing
-            const coloured = item.colour?.hex || '#111111';
-            const svgWithColor = item.svg.replace(
-              /stroke="[^"]*"/g,
-              `stroke="${coloured}"`
-            );
-            inputSvg.value = svgWithColor;
-            console.log('[ACFOI] SVG stored with colour:', item.colour?.hex);
+          // Re-query the LIVE DOM element by ID to handle ACF's DOM manipulation
+          let liveHost = document.getElementById(host.id) as HTMLElement | null;
+          if (!liveHost) {
+            return;
           }
-          if (preview && item.svg) {
-            // Apply the chosen colour from modal to preview
-            const coloured = item.colour?.hex || '#111111';
-            console.log('[ACFOI] Applying colour to preview:', coloured);
-            // Apply colour to the SVG itself
+
+          // CRITICAL: Check if the field we found is still in clone/template state
+          // ACF may have re-cloned it, or we mounted to a clone that became a template again
+          const testInput = liveHost.querySelector(
+            '[data-acfoi-key-out]'
+          ) as HTMLInputElement | null;
+          const isCloneState =
+            testInput?.name.includes('acfcloneindex') || false;
+          const isCloneElement = !!liveHost.closest('.acf-clone');
+
+          // If we're operating on a clone, find the REAL field
+          if (isCloneState || isCloneElement) {
+            const instanceId = liveHost.dataset.acfoiInstanceId;
+            const allFields = document.querySelectorAll('.acfoi-field');
+            let actualField: HTMLElement | null = null;
+
+            for (const field of allFields) {
+              const f = field as HTMLElement;
+              // Match by instance ID (which should be unique per real field)
+              if (f.dataset.acfoiInstanceId === instanceId) {
+                const testInp = f.querySelector(
+                  '[data-acfoi-key-out]'
+                ) as HTMLInputElement | null;
+                const notClone = !f.closest('.acf-clone');
+                const notCloneIndex = !testInp?.name.includes('acfcloneindex');
+                if (notClone && notCloneIndex) {
+                  actualField = f;
+                  break;
+                }
+              }
+            }
+
+            if (actualField) {
+              liveHost = actualField;
+            } else {
+              // Continue anyway - maybe it will work, or we'll see in logs what happens
+            }
+          }
+
+          const currentInputKey = liveHost.querySelector(
+            '[data-acfoi-key-out]'
+          ) as HTMLInputElement;
+          const currentInputSvg = liveHost.querySelector(
+            '[data-acfoi-svg-out]'
+          ) as HTMLTextAreaElement;
+          const currentPreview = liveHost.querySelector(
+            '[data-acfoi-preview]'
+          ) as HTMLElement;
+          const currentOpenBtn = liveHost.querySelector(
+            '[data-acfoi-open]'
+          ) as HTMLButtonElement;
+          const currentClearBtn = liveHost.querySelector(
+            '[data-acfoi-clear]'
+          ) as HTMLButtonElement;
+          const colorTokenInput = liveHost.querySelector(
+            '[data-acfoi-color-token-out]'
+          ) as HTMLInputElement;
+
+          if (currentInputKey) {
+            currentInputKey.value = item.key;
+            currentInputKey.dispatchEvent(
+              new Event('input', { bubbles: true })
+            );
+            currentInputKey.dispatchEvent(
+              new Event('change', { bubbles: true })
+            );
+          }
+
+          if (colorTokenInput && item.color?.token) {
+            colorTokenInput.value = item.color.token;
+            colorTokenInput.dispatchEvent(
+              new Event('input', { bubbles: true })
+            );
+          }
+
+          if (currentInputSvg && item.svg) {
+            const colored = item.color?.hex || '#111111';
             const svgWithColor = item.svg.replace(
               /stroke="[^"]*"/g,
-              `stroke="${coloured}"`
+              `stroke="${colored}"`
             );
-            preview.innerHTML = svgWithColor;
-            preview.style.display = '';
-            // Ensure preview box has correct centering and sizing
-            preview.style.display = 'flex';
-            (preview.style as any).alignItems = 'center';
-            (preview.style as any).justifyContent = 'center';
-            const svg = preview.firstElementChild as HTMLElement | null;
+            currentInputSvg.value = svgWithColor;
+            currentInputSvg.dispatchEvent(
+              new Event('input', { bubbles: true })
+            );
+            currentInputSvg.dispatchEvent(
+              new Event('change', { bubbles: true })
+            );
+          }
+
+          if (currentPreview && item.svg) {
+            const colored = item.color?.hex || '#111111';
+            const svgWithColor = item.svg.replace(
+              /stroke="[^"]*"/g,
+              `stroke="${colored}"`
+            );
+            currentPreview.innerHTML = svgWithColor;
+
+            // Remove display:none from style and ensure display:flex is set
+            const styleAttr = currentPreview.getAttribute('style') || '';
+            const styleParts = styleAttr.split(';').filter((s) => {
+              const trimmed = s.trim();
+              return trimmed && !trimmed.toLowerCase().startsWith('display');
+            });
+            styleParts.push(
+              'display:flex',
+              'align-items:center',
+              'justify-content:center'
+            );
+            const newStyle = styleParts.join(';') + ';';
+            currentPreview.setAttribute('style', newStyle);
+
+            const svg = currentPreview.firstElementChild as HTMLElement | null;
             if (svg) {
               svg.setAttribute('width', '24');
               svg.setAttribute('height', '24');
-              console.log('[ACFOI] SVG dimensions set to 24x24');
             }
+
+            // Force a reflow
+            void currentPreview.offsetHeight;
           }
-          const clearBtn = host.querySelector(
-            '[data-abi-clear]'
-          ) as HTMLButtonElement;
-          if (openBtn) {
-            openBtn.style.display = '';
-            openBtn.textContent = 'Change Icon';
+
+          if (currentOpenBtn) {
+            currentOpenBtn.style.display = '';
+            currentOpenBtn.textContent = 'Change Icon';
           }
-          if (clearBtn) clearBtn.style.display = '';
+
+          if (currentClearBtn) {
+            currentClearBtn.style.display = '';
+          }
         }}
       />
     );
 
-    // Attach open button click handler
+    // Record root to registry for proper lifecycle management
+    registry[instanceId] = { root, mount };
+
+    // Attach open button click handler - ensure only one listener per instance
     if (openBtn) {
-      console.log('[ACFOI] Attaching click handler to button');
-      const clickHandler = () => {
-        console.log('[ACFOI] Button clicked, dispatching modal event');
-        // Trigger modal via custom event
-        window.dispatchEvent(
-          new CustomEvent('abi-open-modal', {
-            detail: { instanceId: host.dataset.abiInstanceId },
-          })
-        );
-      };
-      openBtn.addEventListener('click', clickHandler);
-      const prewarm = () => {
-        window.dispatchEvent(new CustomEvent('abi-prewarm'));
-      };
-      openBtn.addEventListener('mouseenter', prewarm, { passive: true });
-      openBtn.addEventListener('focus', prewarm, { passive: true });
-    } else {
-      console.warn('[ACFOI] No open button found!');
+      // Namespaced listener keys via dataset
+      if ((openBtn as any).__acfoiBound__) {
+        // Already bound for this instance
+      } else {
+        (openBtn as any).__acfoiBound__ = true;
+
+        const clickHandler = () => {
+          window.dispatchEvent(
+            new CustomEvent('acfoi-open-modal', {
+              detail: { instanceId },
+            })
+          );
+        };
+        openBtn.addEventListener('click', clickHandler);
+        const prewarm = () => {
+          window.dispatchEvent(new CustomEvent('acfoi-prewarm'));
+        };
+        openBtn.addEventListener('mouseenter', prewarm, { passive: true });
+        openBtn.addEventListener('focus', prewarm, { passive: true });
+      }
     }
   });
-  console.log('[ACFOI] Pickers mounted');
 }
 
 if (document.readyState === 'loading') {
@@ -141,32 +289,152 @@ if (document.readyState === 'loading') {
   mountPickers();
 }
 
-// ACF append support
-(window as any).acf?.addAction?.('append', ($el: any) => {
-  console.log('[ACFOI] ACF append event');
-  mountPickers();
+// ACF field lifecycle events - append_field fires AFTER field is finalized
+(window as any).acf?.addAction?.('append_field', ($field: any) => {
+  setTimeout(() => mountPickers(), 50);
 });
 
-// Re-mount on ACF ready event
+// ready_field fires when field is ready and finalized
+(window as any).acf?.addAction?.('ready_field', ($field: any) => {
+  setTimeout(() => mountPickers(), 50);
+});
+
+// ACF ready event (initial page load)
 (window as any).acf?.addAction?.('ready', () => {
-  console.log('[ACFOI] ACF ready event');
   mountPickers();
 });
 
-// Event delegation fallback: ensure clicks on [data-abi-open] trigger the modal
+// Event delegation fallback: ensure clicks on [data-acfoi-open] trigger the modal
 document.addEventListener(
   'click',
   (ev) => {
     const target = (ev.target as HTMLElement)?.closest?.(
-      '[data-abi-open]'
+      '[data-acfoi-open]'
     ) as HTMLButtonElement | null;
     if (!target) return;
-    const host = target.closest('.abi-field') as HTMLElement | null;
-    const instanceId = host?.dataset.abiInstanceId || host?.id || '';
-    console.log('[ACFOI] Delegated click on Select Icon', { instanceId });
+    const host = target.closest('.acfoi-field') as HTMLElement | null;
+    const instanceId = host?.dataset.acfoiInstanceId || host?.id || '';
     window.dispatchEvent(
-      new CustomEvent('abi-open-modal', { detail: { instanceId } })
+      new CustomEvent('acfoi-open-modal', { detail: { instanceId } })
     );
+    ev.preventDefault();
+  },
+  true
+);
+
+// Event delegation for remove/clear button: ensure clicks on [data-acfoi-clear] work for dynamically added fields
+document.addEventListener(
+  'click',
+  (ev) => {
+    const target = (ev.target as HTMLElement)?.closest?.(
+      '[data-acfoi-clear]'
+    ) as HTMLButtonElement | null;
+    if (!target) return;
+    const host = target.closest('.acfoi-field') as HTMLElement | null;
+    if (!host) return;
+
+    // Re-query the LIVE DOM element to handle ACF's DOM manipulation
+    const instanceId = host.dataset.acfoiInstanceId || host.id || '';
+    let liveHost = document.getElementById(host.id) as HTMLElement | null;
+    if (!liveHost) {
+      // Fallback: try to find by instance ID
+      liveHost = document.querySelector(
+        `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
+      ) as HTMLElement | null;
+    }
+    if (!liveHost) return;
+
+    // Check if field is in clone state
+    const testInput = liveHost.querySelector(
+      '[data-acfoi-key-out]'
+    ) as HTMLInputElement | null;
+    const isCloneState =
+      testInput?.name.includes('acfcloneindex') || false;
+    const isCloneElement = !!liveHost.closest('.acf-clone');
+
+    // If we're operating on a clone, find the REAL field
+    if (isCloneState || isCloneElement) {
+      const allFields = document.querySelectorAll('.acfoi-field');
+      let actualField: HTMLElement | null = null;
+
+      for (const field of allFields) {
+        const f = field as HTMLElement;
+        if (f.dataset.acfoiInstanceId === instanceId) {
+          const testInp = f.querySelector(
+            '[data-acfoi-key-out]'
+          ) as HTMLInputElement | null;
+          const notClone = !f.closest('.acf-clone');
+          const notCloneIndex = !testInp?.name.includes('acfcloneindex');
+          if (notClone && notCloneIndex) {
+            actualField = f;
+            break;
+          }
+        }
+      }
+
+      if (actualField) {
+        liveHost = actualField;
+      }
+    }
+
+    // Clear the icon data
+    const keyInput = liveHost.querySelector(
+      '[data-acfoi-key-out]'
+    ) as HTMLInputElement | null;
+    const svgInput = liveHost.querySelector(
+      '[data-acfoi-svg-out]'
+    ) as HTMLTextAreaElement | null;
+    const tokenInput = liveHost.querySelector(
+      '[data-acfoi-color-token-out]'
+    ) as HTMLInputElement | null;
+    const preview = liveHost.querySelector(
+      '[data-acfoi-preview]'
+    ) as HTMLElement | null;
+    const openBtn = liveHost.querySelector(
+      '[data-acfoi-open]'
+    ) as HTMLButtonElement | null;
+    const clearBtn = liveHost.querySelector(
+      '[data-acfoi-clear]'
+    ) as HTMLButtonElement | null;
+
+    if (keyInput) {
+      keyInput.value = '';
+      keyInput.dispatchEvent(new Event('input', { bubbles: true }));
+      keyInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    if (svgInput) {
+      svgInput.value = '';
+      svgInput.dispatchEvent(new Event('input', { bubbles: true }));
+      svgInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    if (tokenInput) {
+      tokenInput.value = '';
+      tokenInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    if (preview) {
+      preview.innerHTML = '';
+      const styleAttr = preview.getAttribute('style') || '';
+      const styleParts = styleAttr.split(';').filter((s) => {
+        const trimmed = s.trim();
+        return trimmed && !trimmed.toLowerCase().startsWith('display');
+      });
+      styleParts.push('display:none');
+      const newStyle = styleParts.join(';') + ';';
+      preview.setAttribute('style', newStyle);
+    }
+
+    if (openBtn) {
+      openBtn.style.display = '';
+      openBtn.textContent = 'Select Icon';
+    }
+
+    if (clearBtn) {
+      clearBtn.style.display = 'none';
+    }
+
     ev.preventDefault();
   },
   true

@@ -4,7 +4,8 @@
  * Plugin Name: Advanced Custom Fields: Open Icons
  * Description: ACF field that lets you use popular open-source icon sets (Lucide, Tabler, Heroicons, etc.) with caching, sanitisation, and stable rendering.
  * Version: 0.1.0
- * Author: Your Company
+ * Author: David O'Sullivan
+ * Author URI: https://osull.io
  * License: Proprietary
  * Text Domain: acf-open-icons
  */
@@ -49,7 +50,7 @@ add_action('plugins_loaded', function () {
   });
 });
 
-function abi_enqueue_frontend_assets() {
+function acfoi_enqueue_frontend_assets() {
   $screen = function_exists('get_current_screen') ? get_current_screen() : null;
   $base = $screen ? $screen->base : '';
   // Settings page uses a different hook path
@@ -64,7 +65,7 @@ function abi_enqueue_frontend_assets() {
     ACFOI\Asset_Loader::enqueue_picker_assets();
   }
 }
-add_action('admin_enqueue_scripts', 'abi_enqueue_frontend_assets');
+add_action('admin_enqueue_scripts', 'acfoi_enqueue_frontend_assets');
 
 register_activation_hook(__FILE__, function () {
   $uploads = wp_upload_dir();

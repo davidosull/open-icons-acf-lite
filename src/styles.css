@@ -2,10 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Ensure WP admin doesn't override our custom colour input */
-input[data-abi-colorpicker] {
+/* Ensure WP admin doesn't override our custom color input */
+input[data-acfoi-colorpicker] {
   @apply h-10 w-20 rounded-md border border-zinc-300 bg-white p-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+}
+
+/* Toast animations */
+.acfoi-toast {
+  animation-duration: 0.25s;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.acfoi-toast[data-state='open'] {
+  animation-name: toastEnter;
+}
+
+.acfoi-toast[data-state='closed'] {
+  animation-name: toastExit;
+}
+
+@keyframes toastEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
 }

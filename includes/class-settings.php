@@ -16,8 +16,8 @@ class Settings {
     $this->cache     = $cache;
     add_action('admin_menu', [$this, 'register_menu']);
     add_action('admin_init', [$this, 'register_settings']);
-    add_action('admin_post_abi_purge_cache', [$this, 'handle_purge']);
-    add_action('admin_post_abi_restore_defaults', [$this, 'handle_restore']);
+    add_action('admin_post_acfoi_purge_cache', [$this, 'handle_purge']);
+    add_action('admin_post_acfoi_restore_defaults', [$this, 'handle_restore']);
   }
 
   public function register_menu(): void {
@@ -53,7 +53,7 @@ class Settings {
     if (! current_user_can('manage_options')) {
       wp_die('forbidden');
     }
-    check_admin_referer('abi_admin');
+    check_admin_referer('acfoi_admin');
     // Purge ALL providers/versions to avoid surprises when switching sets
     $this->cache->purge_all();
     wp_safe_redirect(add_query_arg(['page' => 'acf-open-icons', 'purged' => 1], admin_url('edit.php?post_type=acf-field-group')));
@@ -64,7 +64,7 @@ class Settings {
     if (! current_user_can('manage_options')) {
       wp_die('forbidden');
     }
-    check_admin_referer('abi_admin');
+    check_admin_referer('acfoi_admin');
     delete_option($this->option_key);
     wp_safe_redirect(add_query_arg(['page' => 'acf-open-icons', 'restored' => 1], admin_url('edit.php?post_type=acf-field-group')));
     exit;
@@ -78,7 +78,7 @@ class Settings {
       <h1><?php echo esc_html__('Open Icons Settings', 'acf-open-icons'); ?></h1>
       <form method="post" action="options.php" style="margin-bottom:16px;">
         <?php settings_fields('acf_open-icons'); ?>
-        <input type="hidden" name="<?php echo esc_attr($this->option_key); ?>[__nonce]" value="<?php echo esc_attr(wp_create_nonce('abi_admin')); ?>" />
+        <input type="hidden" name="<?php echo esc_attr($this->option_key); ?>[__nonce]" value="<?php echo esc_attr(wp_create_nonce('acfoi_admin')); ?>" />
         <table class="form-table" role="presentation">
           <tr>
             <th scope="row"><?php esc_html_e('Icon Set', 'acf-open-icons'); ?></th>
@@ -97,7 +97,7 @@ class Settings {
             </td>
           </tr>
           <tr>
-            <th scope="row"><?php esc_html_e('Palette colours', 'acf-open-icons'); ?></th>
+            <th scope="row"><?php esc_html_e('Palette colors', 'acf-open-icons'); ?></th>
             <td>
               <?php foreach (['A', 'B', 'C'] as $i => $t) : $item = $settings['palette'][$i] ?? null; ?>
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
@@ -121,13 +121,13 @@ class Settings {
         <?php submit_button(); ?>
       </form>
       <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-        <?php wp_nonce_field('abi_admin'); ?>
-        <input type="hidden" name="action" value="abi_purge_cache" />
+        <?php wp_nonce_field('acfoi_admin'); ?>
+        <input type="hidden" name="action" value="acfoi_purge_cache" />
         <?php submit_button(__('Purge Icon Cache', 'acf-open-icons'), 'secondary'); ?>
       </form>
       <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-        <?php wp_nonce_field('abi_admin'); ?>
-        <input type="hidden" name="action" value="abi_restore_defaults" />
+        <?php wp_nonce_field('acfoi_admin'); ?>
+        <input type="hidden" name="action" value="acfoi_restore_defaults" />
         <?php submit_button(__('Restore Defaults', 'acf-open-icons'), 'delete'); ?>
       </form>
     </div>

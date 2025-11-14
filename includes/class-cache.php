@@ -41,12 +41,15 @@ class Cache {
   }
 
   public function fetch_and_store(string $provider, string $version, string $key): ?string {
+    $fetch_start = microtime(true);
     $meta = $this->providers->get($provider);
     if (! $meta) {
       return null;
     }
     $cdn = $this->build_cdn_url($meta, $version, $key);
+
     $response = wp_remote_get($cdn, ['timeout' => 15]);
+
     if (is_wp_error($response)) {
       return null;
     }
@@ -55,11 +58,99 @@ class Cache {
     if ($code !== 200 || empty($body)) {
       return null;
     }
+
     $sanitised = $this->sanitiser->sanitise($body);
     $sanitised = str_replace('\\"', '"', $sanitised);
     $file      = $this->path_for($provider, $version, $key);
     file_put_contents($file, $sanitised);
     return $sanitised;
+  }
+
+  /**
+   * Fetch multiple icons in parallel using curl_multi_exec
+   * Returns array of [key => svg] for successfully fetched icons
+   */
+  public function fetch_multiple_and_store(string $provider, string $version, array $keys): array {
+    $meta = $this->providers->get($provider);
+    if (! $meta) {
+      return [];
+    }
+
+    // Filter out already cached icons
+    $to_fetch = [];
+    foreach ($keys as $key) {
+      $file = $this->path_for($provider, $version, $key);
+      if (! file_exists($file)) {
+        $to_fetch[] = $key;
+      }
+    }
+
+    if (empty($to_fetch)) {
+      return [];
+    }
+
+    // Build URLs for all icons
+    $urls = [];
+    foreach ($to_fetch as $key) {
+      $urls[$key] = $this->build_cdn_url($meta, $version, $key);
+    }
+
+    // Use curl_multi for parallel requests
+    $multi_handle = curl_multi_init();
+    $curl_handles = [];
+    $results = [];
+
+    // Create curl handles for each URL
+    foreach ($urls as $key => $url) {
+      $ch = curl_init($url);
+      curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_USERAGENT => 'WordPress/' . get_bloginfo('version') . '; ' . home_url(),
+      ]);
+      curl_multi_add_handle($multi_handle, $ch);
+      $curl_handles[$key] = $ch;
+    }
+
+    // Execute all requests in parallel
+    $running = null;
+    do {
+      $status = curl_multi_exec($multi_handle, $running);
+      if ($running > 0) {
+        curl_multi_select($multi_handle, 0.1); // Wait for activity
+      }
+    } while ($running > 0 && $status === CURLM_OK);
+
+    // Process results
+    foreach ($curl_handles as $key => $ch) {
+      $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+      $body = curl_multi_getcontent($ch);
+      $error = curl_error($ch);
+
+      if ($error) {
+        curl_multi_remove_handle($multi_handle, $ch);
+        curl_close($ch);
+        continue;
+      }
+
+      if ($http_code === 200 && ! empty($body)) {
+        $sanitised = $this->sanitiser->sanitise($body);
+        $sanitised = str_replace('\\"', '"', $sanitised);
+        $file = $this->path_for($provider, $version, $key);
+        file_put_contents($file, $sanitised);
+        $results[$key] = $sanitised;
+      }
+
+      curl_multi_remove_handle($multi_handle, $ch);
+      curl_close($ch);
+    }
+
+    curl_multi_close($multi_handle);
+
+    return $results;
   }
 
   private function build_cdn_url(array $meta, string $version, string $key): string {

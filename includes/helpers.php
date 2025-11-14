@@ -4,33 +4,174 @@ if (! defined('ABSPATH')) {
   exit;
 }
 
-if (! function_exists('bic_icon')) {
-  function bic_icon($args = []) {
-    $args = wp_parse_args($args, [
-      'value'    => null, // ACF value array
-      'provider' => null,
-      'key'      => null,
-      'colour'   => null,
-      'size'     => 24,
-    ]);
+/**
+ * Display an icon from ACF Open Icons field.
+ *
+ * @param array|string $value   Required. ACF field value array (must contain 'svg' and optionally 'colorToken'), or legacy array with 'value' key.
+ * @param array        $atts    Optional. Arguments to control icon display.
+ *                              @type string $color Override color (hex code). If not provided and 'colorToken' exists, uses current settings.
+ *                              @type int    $size  Icon size in pixels. Default 24.
+ *                              @type string $class CSS class name(s) to add to the SVG element. Default empty.
+ *                              @type bool   $echo  Whether to echo or return. Default true.
+ * @return string|void SVG markup if $echo is false, otherwise echoes.
+ */
+function acf_open_icon($value = null, $atts = []) {
+  // Backwards compatibility: detect if first param is an array with 'value' key
+  if (is_array($value) && isset($value['value']) && ! isset($value['svg']) && ! isset($value['iconKey'])) {
+    // Old API: acf_open_icon(['value' => $icon_field, 'size' => 32])
+    $atts = $value;
+    $value = $atts['value'] ?? null;
+  }
 
-    $svg = '';
-    if (is_array($args['value']) && ! empty($args['value']['svg'])) {
-      $svg = $args['value']['svg'];
+  $atts = wp_parse_args($atts, [
+    'color' => null,
+    'size'  => 24,
+    'class' => '',
+    'echo'  => true,
+  ]);
+
+  if (! is_array($value)) {
+    return $atts['echo'] ? '' : '';
+  }
+
+  $size   = (int) $atts['size'];
+  $svg    = null;
+
+  // If we have a colorToken, fetch fresh SVG from cache and apply current color
+  // This allows icons to update when settings change
+  // Handle both iconKey (camelCase) and iconkey (lowercase) from database
+  $iconKey = ! empty($value['iconKey']) ? $value['iconKey'] : (! empty($value['iconkey']) ? $value['iconkey'] : '');
+
+  if (! empty($value['colorToken']) && ! empty($value['provider']) && ! empty($iconKey)) {
+    $providers = new \ACFOI\Providers();
+    $sanitiser = new \ACFOI\Sanitiser();
+    $cache     = new \ACFOI\Cache($providers, $sanitiser);
+
+    $provider = sanitize_key($value['provider']);
+    $version  = sanitize_text_field($value['version'] ?? 'latest');
+    $iconKey  = sanitize_title_with_dashes($iconKey);
+
+    // Fetch original SVG from cache (without color applied)
+    $svg = $cache->get_svg($provider, $version, $iconKey);
+
+    if ($svg) {
+      // Get current color from settings based on token
+      if (empty($atts['color'])) {
+        $settings = get_option('acf_open_icons_settings', []);
+        $palette  = $settings['palette'] ?? [];
+        if (is_array($palette)) {
+          foreach ($palette as $item) {
+            if (isset($item['token']) && $item['token'] === $value['colorToken']) {
+              $atts['color'] = $item['hex'] ?? null;
+              break;
+            }
+          }
+        }
+      }
+
+      // Apply color if we have one
+      if (! empty($atts['color'])) {
+        // Replace ALL stroke attributes throughout the SVG (on paths, circles, etc.)
+        // Match stroke="...", stroke='...', or stroke=... and replace with stroke="newcolor"
+        $svg = preg_replace('/stroke\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'stroke="' . esc_attr($atts['color']) . '"', $svg);
+      }
+    }
+  }
+
+  // Fallback to stored SVG if we don't have a token or cache fetch failed
+  if (empty($svg) && ! empty($value['svg'])) {
+    $svg = $value['svg'];
+
+    // Apply override color if provided
+    if (! empty($atts['color'])) {
+      // Replace ALL stroke attributes throughout the SVG
+      $svg = preg_replace('/stroke\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'stroke="' . esc_attr($atts['color']) . '"', $svg);
+    }
+  }
+
+  if (empty($svg)) {
+    return $atts['echo'] ? '' : '';
+  }
+
+  // Extract and modify only the <svg> opening tag's attributes
+  // This ensures child elements (like <rect>, <circle>) keep their width/height attributes
+  if (preg_match('/<svg\s+([^>]*)>/i', $svg, $matches)) {
+    $attributes = $matches[1];
+
+    // Remove width, height, and viewBox only from the SVG element's attributes
+    // (not from child elements - they need to keep their dimensions)
+    $attributes = preg_replace('/\bwidth\s*=\s*["\'][^"\']*["\']/i', '', $attributes);
+    $attributes = preg_replace('/\bheight\s*=\s*["\'][^"\']*["\']/i', '', $attributes);
+
+    // Preserve viewBox if it exists (it's important for SVG scaling)
+    $viewbox = '';
+    if (preg_match('/\bviewBox\s*=\s*["\']([^"\']*)["\']/i', $attributes, $viewbox_match)) {
+      $viewbox = ' viewBox="' . esc_attr($viewbox_match[1]) . '"';
+      // Remove viewBox from attributes string since we'll add it back separately
+      $attributes = preg_replace('/\bviewBox\s*=\s*["\'][^"\']*["\']/i', '', $attributes);
     }
 
-    if (empty($svg)) {
-      return '';
+    // Prepare class attribute
+    $class_attr = '';
+    if (! empty($atts['class'])) {
+      // Split by spaces and sanitize each class individually
+      $class_parts = explode(' ', trim($atts['class']));
+      $sanitized_classes = array_filter(array_map('sanitize_html_class', $class_parts));
+      if (! empty($sanitized_classes)) {
+        $class_attr = ' class="' . esc_attr(implode(' ', $sanitized_classes)) . '"';
+      }
     }
 
-    $size_attr = (int) $args['size'];
-    $colour    = $args['colour'];
-    if ($colour) {
-      $svg = preg_replace('/(stroke|fill)="(currentColor|#[0-9a-fA-F]{3,6})"/i', '$1="' . esc_attr($colour) . '"', $svg);
+    // Check if class already exists in attributes and merge if needed
+    if (preg_match('/\bclass\s*=\s*["\']([^"\']*)["\']/i', $attributes, $class_match)) {
+      // Merge with existing class
+      $existing_classes = explode(' ', trim($class_match[1]));
+      $new_classes = ! empty($atts['class']) ? explode(' ', trim($atts['class'])) : [];
+      $all_classes = array_unique(array_merge($existing_classes, $new_classes));
+      $all_classes = array_filter(array_map('sanitize_html_class', $all_classes));
+      if (! empty($all_classes)) {
+        $class_attr = ' class="' . esc_attr(implode(' ', $all_classes)) . '"';
+        // Remove existing class attribute
+        $attributes = preg_replace('/\bclass\s*=\s*["\'][^"\']*["\']/i', '', $attributes);
+      }
     }
 
-    $svg = preg_replace('/(width|height)="[^"]*"/', '', $svg);
-    $svg = preg_replace('/<svg /', '<svg width="' . $size_attr . '" height="' . $size_attr . '" ', $svg, 1);
+    // Clean up extra spaces in attributes
+    $attributes = preg_replace('/\s+/', ' ', trim($attributes));
+
+    // Reconstruct the <svg> tag with new size, preserved viewBox, class, and other attributes
+    $new_svg_tag = '<svg width="' . $size . '" height="' . $size . '"' . $viewbox . $class_attr;
+    if (! empty($attributes)) {
+      $new_svg_tag .= ' ' . $attributes;
+    }
+    $new_svg_tag .= '>';
+
+    // Replace only the opening tag in the original SVG
+    $svg = str_replace($matches[0], $new_svg_tag, $svg);
+  } else {
+    // Fallback if no existing attributes - create minimal SVG tag
+    $class_attr = '';
+    if (! empty($atts['class'])) {
+      $class_parts = explode(' ', trim($atts['class']));
+      $sanitized_classes = array_filter(array_map('sanitize_html_class', $class_parts));
+      if (! empty($sanitized_classes)) {
+        $class_attr = ' class="' . esc_attr(implode(' ', $sanitized_classes)) . '"';
+      }
+    }
+    $svg = preg_replace('/<svg\s*>/i', '<svg width="' . $size . '" height="' . $size . '"' . $class_attr . '>', $svg);
+  }
+
+  if ($atts['echo']) {
     echo $svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+  } else {
+    return $svg;
   }
 }
+
+// Backwards compatibility
+if (! function_exists('bic_icon')) {
+  function bic_icon($value = null, $atts = []) {
+    return acf_open_icon($value, $atts);
+  }
+}
+

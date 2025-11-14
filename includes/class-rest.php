@@ -40,7 +40,7 @@ class Rest {
       'methods'  => 'POST',
       'callback' => [$this, 'purge_cache'],
       'permission_callback' => function () {
-        return current_user_can('manage_options') && check_ajax_referer('abi_admin', false, false);
+        return current_user_can('manage_options') && check_ajax_referer('acfoi_admin', false, false);
       },
     ]);
   }
@@ -51,11 +51,11 @@ class Rest {
     $key      = sanitize_title_with_dashes((string) $req->get_param('key'));
 
     if (! $this->providers->get($provider) || empty($key)) {
-      return new \WP_Error('abi_bad_request', __('Invalid provider or key.', 'acf-open-icons'), ['status' => 400]);
+      return new \WP_Error('acfoi_bad_request', __('Invalid provider or key.', 'acf-open-icons'), ['status' => 400]);
     }
     $svg = $this->cache->get_svg($provider, $version ?: 'latest', $key);
     if (! $svg) {
-      return new \WP_Error('abi_not_found', __('Icon not found.', 'acf-open-icons'), ['status' => 404]);
+      return new \WP_Error('acfoi_not_found', __('Icon not found.', 'acf-open-icons'), ['status' => 404]);
     }
 
     status_header(200);
@@ -70,7 +70,7 @@ class Rest {
     $version  = sanitize_text_field((string) $req->get_param('version')) ?: 'latest';
     $search  = sanitize_text_field((string) $req->get_param('q'));
 
-    $cache_key = 'abi_manifest_' . md5($provider . '|' . $version);
+    $cache_key = 'acfoi_manifest_' . md5($provider . '|' . $version);
     $icons = get_transient($cache_key);
 
     if (! is_array($icons)) {
@@ -86,7 +86,8 @@ class Rest {
       }));
     }
 
-    return ['icons' => array_slice($icons, 0, 2000)];
+    // Return all icons (no limit - frontend handles virtual scrolling)
+    return ['icons' => $icons];
   }
 
   private function fetch_manifest(string $provider, string $version): array {
@@ -144,21 +145,46 @@ class Rest {
   }
 
   public function get_bundle(\WP_REST_Request $req) {
+    $start_time = microtime(true);
     $provider = sanitize_key((string) $req->get_param('provider'));
     $version  = sanitize_text_field((string) $req->get_param('version')) ?: 'latest';
     $keys     = (string) $req->get_param('keys');
     $keys_arr = array_filter(array_map('sanitize_title_with_dashes', explode(',', $keys)));
-    $out      = [];
-    error_log('[ACFOI] Bundle request provider=' . $provider . ' version=' . $version . ' keys=' . count($keys_arr));
+
+    $out = [];
+    $cache_hits = 0;
+    $cache_misses = [];
+
+    // First, check cache for all icons
     foreach ($keys_arr as $k) {
-      $svg = $this->cache->get_svg($provider, $version, $k);
-      if ($svg) {
-        $out[] = ['key' => $k, 'svg' => $svg];
+      $file = $this->cache->path_for($provider, $version, $k);
+      if (file_exists($file)) {
+        $svg = file_get_contents($file);
+        if (strpos($svg, '\\"') !== false) {
+          $svg = str_replace('\\"', '"', $svg);
+          file_put_contents($file, $svg);
+        }
+        if ($svg) {
+          $out[] = ['key' => $k, 'svg' => $svg];
+          $cache_hits++;
+        }
       } else {
-        error_log('[ACFOI] Bundle miss for key=' . $k . ' provider=' . $provider);
+        $cache_misses[] = $k;
       }
     }
-    error_log('[ACFOI] Bundle response items=' . count($out));
+
+    // Fetch missing icons in parallel
+    $fetched_count = 0;
+    if (! empty($cache_misses)) {
+      $fetched = $this->cache->fetch_multiple_and_store($provider, $version, $cache_misses);
+      $fetched_count = count($fetched);
+      foreach ($fetched as $k => $svg) {
+        $out[] = ['key' => $k, 'svg' => $svg];
+      }
+    }
+
+    // Return bundle response
+
     return ['items' => $out];
   }
 
@@ -166,7 +192,7 @@ class Rest {
     $provider = sanitize_key((string) $req->get_param('provider'));
     $version  = sanitize_text_field((string) $req->get_param('version'));
     if (! $this->providers->get($provider) || ! $version) {
-      return new \WP_Error('abi_bad_request', __('Invalid provider or version.', 'acf-open-icons'), ['status' => 400]);
+      return new \WP_Error('acfoi_bad_request', __('Invalid provider or version.', 'acf-open-icons'), ['status' => 400]);
     }
     $this->cache->purge($provider, $version);
     return ['ok' => true];

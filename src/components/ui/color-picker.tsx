@@ -9,15 +9,9 @@ export interface ColorPickerProps
 
 const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
   ({ className, value, onChange, ...props }, ref) => {
-    React.useEffect(() => {
-      // Debug: confirm component is mounted (should log three times on settings page)
-      // eslint-disable-next-line no-console
-      console.log('[ACFOI Settings] ColorPicker mounted with', value);
-    }, []);
-
     return (
       <input
-        data-abi-colorpicker
+        data-acfoi-colorpicker
         type='color'
         value={value}
         onChange={onChange}

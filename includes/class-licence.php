@@ -7,7 +7,7 @@ if (! defined('ABSPATH')) {
 }
 
 class Licence {
-  private $option_key = 'abi_licence';
+  private $option_key = 'acfoi_licence';
 
   public function __construct() {
     add_action('admin_init', [$this, 'maybe_block_without_licence']);
