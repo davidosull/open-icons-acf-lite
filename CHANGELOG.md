@@ -5,7 +5,9 @@
 ### Added
 
 #### Features
+
 - **"Use Last Color" Feature**: Added field-level setting to remember and automatically apply the last selected color for subsequent icon selections within the same context (repeater field or flexible content layout). This significantly improves workflow when adding multiple icons with the same color.
+
   - Context-aware: Repeater fields share the last color, while flexible content layouts are independent
   - Stored in localStorage per context for persistence across page loads
   - Default enabled for new fields
@@ -27,6 +29,7 @@
   - Properly sanitized for security
 
 #### Performance Improvements
+
 - **Parallel CDN Fetching**: Implemented parallel icon fetching using `curl_multi_exec` to fetch multiple icons from CDN simultaneously instead of sequentially. This dramatically reduces the time to load icons on first filter/search (from ~15 seconds to ~2 seconds for 45 icons).
 - **Removed Icon Count Limits**: Removed hardcoded limits that were preventing all icons from loading. The icon picker now displays all available icons (1860+ icons) instead of stopping at ~527.
 - **Optimized Icon Loading**:
@@ -57,12 +60,14 @@
 ### Technical Improvements
 
 - **Code Quality**:
+
   - Removed all debug logging statements
   - Improved error handling for missing/malformed manifest files
   - Better handling of ACF field lifecycle events
   - Optimized React component rendering and state management
 
 - **Context Detection**: Implemented robust field context detection to identify:
+
   - Field group key
   - Flexible content layout name
   - Repeater field key
@@ -74,4 +79,3 @@
 ## [0.1.0] - Initial Release
 
 Initial release of ACF Open Icons plugin.
-
