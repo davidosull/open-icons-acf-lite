@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { flushSync } from 'react-dom';
 import { DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { SelectMenu } from './ui/select-menu';
@@ -197,6 +198,61 @@ function saveLastColor(
   } catch {}
 }
 
+/**
+ * Apply color to SVG, detecting whether to use fill or stroke (or both).
+ * Matches the PHP backend logic for consistency.
+ */
+function applyColorToSvg(svg: string, color: string): string {
+  if (!svg || !color) return svg;
+
+  // Detect if icon uses fill or stroke (or both)
+  // Some icon sets (e.g., Heroicons solid) use fill, others use stroke
+  const hasStroke = /\bstroke(?!-)\s*=/i.test(svg);
+  const hasFill = /\bfill(?!-)\s*=/i.test(svg) && !/fill\s*=\s*["']none["']/i.test(svg);
+
+  let result = svg;
+
+  // Apply color to stroke if present
+  if (hasStroke) {
+    // Use negative lookahead to avoid matching stroke-width, stroke-linecap, etc.
+    result = result.replace(/\bstroke(?!-)\s*=\s*["']?[^"'\s>]*["']?/gi, `stroke="${color}"`);
+  }
+
+  // Apply color to fill if present and not explicitly set to "none"
+  if (hasFill) {
+    // Use negative lookahead to avoid matching fill-opacity, fill-rule, etc.
+    result = result.replace(/\bfill(?!-)\s*=\s*["']?[^"'\s>]*["']?/gi, `fill="${color}"`);
+  }
+
+  return result;
+}
+
+/**
+ * Normalize SVG to base form (remove color, set to currentColor).
+ * Used when storing base SVG in cache.
+ */
+function normalizeSvgToBase(svg: string): string {
+  if (!svg) return svg;
+
+  // Detect if icon uses fill or stroke
+  const hasStroke = /\bstroke(?!-)\s*=/i.test(svg);
+  const hasFill = /\bfill(?!-)\s*=/i.test(svg) && !/fill\s*=\s*["']none["']/i.test(svg);
+
+  let result = svg;
+
+  // Normalize stroke to currentColor if present
+  if (hasStroke) {
+    result = result.replace(/\bstroke(?!-)\s*=\s*["']?[^"'\s>]*["']?/gi, 'stroke="currentColor"');
+  }
+
+  // Normalize fill to currentColor if present (and not none)
+  if (hasFill) {
+    result = result.replace(/\bfill(?!-)\s*=\s*["']?[^"'\s>]*["']?/gi, 'fill="currentColor"');
+  }
+
+  return result;
+}
+
 export default function IconPicker({
   provider,
   version,
@@ -205,6 +261,9 @@ export default function IconPicker({
   useLastColor = false,
   fieldKey = '',
   fieldGroupKey = '',
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  disableColorPicker = false,
 }: {
   provider: string;
   version: string;
@@ -213,9 +272,15 @@ export default function IconPicker({
   useLastColor?: boolean;
   fieldKey?: string;
   fieldGroupKey?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  disableColorPicker?: boolean;
 }) {
   const restBase = useRestBase();
-  const [open, setOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? (controlledOnOpenChange || (() => {})) : setInternalOpen;
   const [query, setQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const palette: { token: string; label?: string; hex: string }[] =
@@ -273,6 +338,7 @@ export default function IconPicker({
   const [all, setAll] = React.useState<string[]>([]);
   const [cache, setCache] = React.useState<Record<string, string>>({});
   const [activeIdx, setActiveIdx] = React.useState(0);
+  const [manifestLoading, setManifestLoading] = React.useState(true);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const gridRef = React.useRef<HTMLDivElement | null>(null);
   const [visibleRange, setVisibleRange] = React.useState({ start: 0, end: 50 });
@@ -300,6 +366,9 @@ export default function IconPicker({
     return () => clearTimeout(timer);
   }, [query, debouncedQuery]);
 
+  // Track if we've initialized the color from last color (to prevent overriding user changes)
+  const colorInitializedRef = React.useRef(false);
+
   // Read current icon from DOM when modal opens
   React.useEffect(() => {
     if (open && instanceId) {
@@ -320,43 +389,49 @@ export default function IconPicker({
             '[data-acfoi-svg-out]'
           ) as HTMLTextAreaElement | null;
           if (svgInput?.value) {
-            // Extract the base SVG (without color) by removing stroke color
-            const baseSvg = svgInput.value.replace(/stroke="[^"]*"/g, 'stroke="currentColor"');
+            // Extract the base SVG (without color) by normalizing to currentColor
+            const baseSvg = normalizeSvgToBase(svgInput.value);
             setCache((prev) => ({ ...prev, [currentKey]: baseSvg }));
           }
         }
 
-        // Sync the color picker - only update if different from current state
+        // Sync the color picker - only on initial open, don't override user changes
         const colorTokenInput = field.querySelector(
           '[data-acfoi-color-token-out]'
         ) as HTMLInputElement | null;
         if (colorTokenInput?.value) {
-          // If icon already has a color, use it (only if different)
-          const token = colorTokenInput.value;
-          const matchingPalette = palette.find((p) => p.token === token);
-          if (matchingPalette && (currentToken !== token || currentColor !== matchingPalette.hex)) {
-            setCurrentToken(token);
-            setCurrentColor(matchingPalette.hex);
+          // If icon already has a color, use it (only if we haven't initialized yet)
+          if (!colorInitializedRef.current) {
+            const token = colorTokenInput.value;
+            const matchingPalette = palette.find((p) => p.token === token);
+            if (matchingPalette) {
+              setCurrentToken(token);
+              setCurrentColor(matchingPalette.hex);
+              colorInitializedRef.current = true;
+            }
           }
-        } else if (useLastColor) {
-          // If "Use Last Color" is enabled and no color is set, try to get last color
-          // Only update if different from current state to avoid unnecessary re-renders
+        } else if (useLastColor && !colorInitializedRef.current) {
+          // If "Use Last Color" is enabled and no color is set, use last color as DEFAULT
+          // Only set it once on initial open, don't force it if user changes it
           const context = getFieldContext(instanceId);
           const lastColor = getLastColor(
             context.fieldGroupKey || fieldGroupKey,
             context.flexibleLayout,
             context.repeaterKey
           );
-          if (lastColor && (currentToken !== lastColor.token || currentColor !== lastColor.hex)) {
+          if (lastColor) {
             setCurrentToken(lastColor.token);
             setCurrentColor(lastColor.hex);
+            colorInitializedRef.current = true;
           }
         }
       }
     } else {
       setCurrentIconKey(null);
+      // Reset initialization flag when modal closes
+      colorInitializedRef.current = false;
     }
-  }, [open, instanceId, palette, useLastColor, fieldGroupKey, cache, currentToken, currentColor]);
+  }, [open, instanceId, palette, useLastColor, fieldGroupKey, cache]);
 
   // Fetch current icon SVG if not in cache (after ensureSvg is defined)
   React.useEffect(() => {
@@ -367,8 +442,8 @@ export default function IconPicker({
       fetch(url)
         .then((r) => r.text())
         .then((svg) => {
-          // Store base SVG (without color)
-          const baseSvg = svg.replace(/stroke="[^"]*"/g, 'stroke="currentColor"');
+          // Store base SVG (without color) - normalize to currentColor
+          const baseSvg = normalizeSvgToBase(svg);
           setCache((prev) => ({ ...prev, [currentIconKey]: baseSvg }));
         })
         .catch(() => {});
@@ -415,20 +490,30 @@ export default function IconPicker({
   // load manifest once
   React.useEffect(() => {
     let mounted = true;
+    setManifestLoading(true);
     async function load() {
       const url = `${restBase}/acf-open-icons/v1/manifest?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}`;
       const res = await fetch(url);
-      if (!res.ok) return;
+      if (!res.ok) {
+        if (mounted) setManifestLoading(false);
+        return;
+      }
       const data = await res.json();
-      if (mounted) setAll(data.icons || []);
+      if (mounted) {
+        // Deduplicate icons array to prevent duplicate key warnings
+        const icons = data.icons || [];
+        const uniqueIcons = Array.from(new Set(icons));
+        setAll(uniqueIcons);
+        setManifestLoading(false);
+      }
     }
     load();
     return () => {
       mounted = false;
     };
-  }, [provider, version]);
+  }, [provider, version, restBase]);
 
   // Eagerly load first 24 icons when modal opens (for immediate display)
   React.useEffect(() => {
@@ -498,11 +583,14 @@ export default function IconPicker({
       ? (all || []).filter((k) => k.toLowerCase().includes(lowerQuery))
       : all || [];
 
+    // Deduplicate to prevent duplicate key warnings
+    const uniqueFiltered = Array.from(new Set(filtered));
+
     if (filterStartTimeRef.current) {
       filterStartTimeRef.current = null;
     }
 
-    return filtered;
+    return uniqueFiltered;
   }, [all, debouncedQuery]);
 
   // Separate recent icons from main list
@@ -761,17 +849,54 @@ export default function IconPicker({
     )}&version=${encodeURIComponent(version)}&key=${encodeURIComponent(key)}`;
     const res = await fetch(url);
     let svg = await res.text();
-    // Apply chosen color to SVG - ONLY stroke, NEVER fill (line icons)
-    svg = svg.replace(/stroke="[^"]*"/g, `stroke="${currentColor}"`);
+    // Apply chosen color to SVG - detects fill or stroke (or both)
+    svg = applyColorToSvg(svg, currentColor);
     setCache((prev) => ({ ...prev, [key]: svg }));
     return svg;
   }
 
   async function pick(key: string) {
-    const svg = await ensureSvg(key);
+    const startTime = performance.now();
+    console.log('[IconPicker Debug] pick() called for icon:', key);
+
+    // Call onSelect immediately with cached SVG if available (non-blocking)
+    const cachedSvg = cache[key];
+    console.log('[IconPicker Debug] Cached SVG available:', !!cachedSvg);
+
     addRecent(key);
     const color = { token: currentToken, hex: currentColor };
-    onSelect({ key, svg, color });
+
+    // Close modal FIRST (before calling onSelect) to ensure immediate visual feedback
+    console.log('[IconPicker Debug] Closing modal immediately...');
+    const closeStart = performance.now();
+
+    // Use flushSync to force immediate React update and visual close
+    flushSync(() => {
+      setOpen(false);
+    });
+
+    const closeEnd = performance.now();
+    console.log('[IconPicker Debug] setOpen(false) called with flushSync in', (closeEnd - closeStart).toFixed(2), 'ms');
+
+    // Call onSelect immediately after modal is closed (don't wait for next frame)
+    console.log('[IconPicker Debug] Calling onSelect callback...');
+    const onSelectStart = performance.now();
+    onSelect({ key, svg: cachedSvg, color });
+    const onSelectEnd = performance.now();
+    console.log('[IconPicker Debug] onSelect callback completed in', (onSelectEnd - onSelectStart).toFixed(2), 'ms');
+    console.log('[IconPicker Debug] Total pick() execution time:', (onSelectEnd - startTime).toFixed(2), 'ms');
+
+    // Fetch SVG in background if not cached (for preview purposes)
+    if (!cachedSvg) {
+      console.log('[IconPicker Debug] Fetching SVG in background for:', key);
+      ensureSvg(key).then((svg) => {
+        console.log('[IconPicker Debug] Background SVG fetch completed for:', key);
+        // Update callback if needed, but don't block UI
+        onSelect({ key, svg, color });
+      }).catch((err) => {
+        console.error('[IconPicker Debug] Background SVG fetch failed:', err);
+      });
+    }
 
     // Save last color if "Use Last Color" is enabled
     if (useLastColor && instanceId) {
@@ -783,8 +908,6 @@ export default function IconPicker({
         color
       );
     }
-
-    setOpen(false);
   }
 
   // Apply color to current icon and close modal
@@ -808,8 +931,10 @@ export default function IconPicker({
     setOpen(false); // Close modal after applying
   }
 
-  // Listen for open button clicks - only open if this instance matches
+  // Listen for open button clicks - only open if this instance matches (skip if controlled)
   React.useEffect(() => {
+    if (isControlled) return; // Skip event listener if controlled externally
+
     const handler = (e: Event) => {
       const customEvent = e as CustomEvent<{ instanceId?: string }>;
       const eventInstanceId = customEvent.detail?.instanceId;
@@ -851,7 +976,7 @@ export default function IconPicker({
     };
     window.addEventListener('acfoi-open-modal', handler);
     return () => window.removeEventListener('acfoi-open-modal', handler);
-  }, [instanceId, useLastColor, fieldGroupKey, palette]);
+  }, [instanceId, useLastColor, fieldGroupKey, palette, isControlled]);
 
   // Simple luminance to detect overly light colors
   function isLight(hex: string): boolean {
@@ -872,22 +997,27 @@ export default function IconPicker({
   const renderIconButton = (key: string, idx: number, isRecent = false) => {
     const svgRaw = cache[key];
     const svgColored = svgRaw
-      ? svgRaw.replace(/stroke="[^"]*"/g, `stroke="${currentColor}"`)
+      ? applyColorToSvg(svgRaw, currentColor)
       : '';
     const isActive = idx === activeIdx;
 
     return (
       <button
-        key={key}
+        key={`${isRecent ? 'recent-' : 'main-'}${key}-${idx}`}
         data-index={idx}
         aria-label={`Select icon: ${key}`}
-        className={`group flex flex-col aspect-square items-center border rounded-lg p-3 transition-all duration-200 hover:bg-accent hover:border-primary/30 hover:scale-[1.02] hover:shadow-sm ${
+        type='button'
+        className={`group flex flex-col aspect-square items-center border rounded-lg p-3 transition-all duration-200 hover:bg-accent hover:border-primary/30 hover:scale-[1.02] hover:shadow-sm cursor-pointer ${
           isActive
             ? 'ring-2 ring-primary ring-offset-1 bg-primary/5 border-primary/50 shadow-sm'
             : 'border-zinc-200'
         } ${isLight(currentColor) ? 'bg-zinc-600 text-white' : ''}`}
         onMouseEnter={() => setActiveIdx(idx)}
-        onClick={() => pick(key)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          pick(key);
+        }}
       >
         <div className='flex-1 flex items-center justify-center'>
           {svgColored ? (
@@ -921,7 +1051,7 @@ export default function IconPicker({
           <button
             type='button'
             onClick={() => setOpen(false)}
-            className='rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+            className='rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer'
             aria-label='Close dialog'
           >
             <svg
@@ -1015,24 +1145,26 @@ export default function IconPicker({
               </button>
             )}
           </div>
-          <SelectMenu
-            className='w-[180px] shrink-0'
-            items={(palette.length
-              ? palette
-              : [{ token: 'A', label: 'Primary', hex: currentColor }]
-            ).map((p) => ({
-              value: p.token,
-              label: p.label || p.token,
-              hex: p.hex,
-            }))}
-            value={currentToken}
-            onChange={(val) => {
-              setCurrentToken(val);
-              const hex =
-                palette.find((p) => p.token === val)?.hex || currentColor;
-              setCurrentColor(hex);
-            }}
-          />
+          {!disableColorPicker && (
+            <SelectMenu
+              className='w-[180px] shrink-0'
+              items={(palette.length
+                ? palette
+                : [{ token: 'A', label: 'Primary', hex: currentColor }]
+              ).map((p) => ({
+                value: p.token,
+                label: p.label || p.token,
+                hex: p.hex,
+              }))}
+              value={currentToken}
+              onChange={(val) => {
+                setCurrentToken(val);
+                const hex =
+                  palette.find((p) => p.token === val)?.hex || currentColor;
+                setCurrentColor(hex);
+              }}
+            />
+          )}
         </div>
         {/* Results counter */}
         {(query || list.length > 0) && (
@@ -1093,7 +1225,31 @@ export default function IconPicker({
             </div>
           )}
 
-          {list.length === 0 && !debouncedQuery && (
+          {manifestLoading && (
+            <div className='py-16 text-center'>
+              <svg
+                className='w-16 h-16 mx-auto text-zinc-300 mb-4 animate-pulse'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth='1.5'
+                  d='M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4'
+                />
+              </svg>
+              <div className='text-sm font-medium text-zinc-700 mb-1'>
+                Loading icons...
+              </div>
+              <div className='text-xs text-muted-foreground'>
+                Please wait while we fetch the icon library
+              </div>
+            </div>
+          )}
+
+          {!manifestLoading && list.length === 0 && !debouncedQuery && (
             <div className='py-16 text-center'>
               <svg
                 className='w-16 h-16 mx-auto text-zinc-300 mb-4'
@@ -1112,7 +1268,7 @@ export default function IconPicker({
                 No icons available
               </div>
               <div className='text-xs text-muted-foreground'>
-                Icons are loading, please wait…
+                Unable to load icons from the icon library
               </div>
             </div>
           )}

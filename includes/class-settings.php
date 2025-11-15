@@ -10,14 +10,25 @@ class Settings {
   private $option_key = 'acf_open_icons_settings';
   private $providers;
   private $cache;
+  private $migration;
+  private $old_settings_value = null;
 
-  public function __construct(Providers $providers, Cache $cache) {
+  public function __construct(Providers $providers, Cache $cache, ?Migration $migration = null) {
     $this->providers = $providers;
     $this->cache     = $cache;
+    $this->migration = $migration;
     add_action('admin_menu', [$this, 'register_menu']);
     add_action('admin_init', [$this, 'register_settings']);
     add_action('admin_post_acfoi_purge_cache', [$this, 'handle_purge']);
     add_action('admin_post_acfoi_restore_defaults', [$this, 'handle_restore']);
+
+    // Hook into option update to detect provider changes
+    // Use priority 20 to ensure it runs after sanitization
+    add_action('update_option_' . $this->option_key, [$this, 'detect_provider_change'], 20, 2);
+
+    // Hook into option update to detect color token changes
+    // Use priority 25 to run after provider change detection
+    add_action('update_option_' . $this->option_key, [$this, 'detect_color_token_changes'], 25, 2);
   }
 
   public function register_menu(): void {
@@ -32,7 +43,30 @@ class Settings {
   }
 
   public function register_settings(): void {
-    register_setting('acf_open-icons', $this->option_key);
+    register_setting('acf_open-icons', $this->option_key, [
+      'sanitize_callback' => [$this, 'sanitize_settings'],
+    ]);
+  }
+
+  /**
+   * Sanitize settings and detect provider changes.
+   *
+   * @param mixed $value New settings value
+   * @return array Sanitized settings value
+   */
+  public function sanitize_settings($value): array {
+    // Store old value before sanitization (for use in detect_provider_change)
+    $this->old_settings_value = get_option($this->option_key, []);
+
+    // Ensure value is an array
+    $value = is_array($value) ? $value : [];
+
+    // Remove the nonce from the value if present
+    if (isset($value['__nonce'])) {
+      unset($value['__nonce']);
+    }
+
+    return $value;
   }
 
   public function get_settings(): array {
@@ -47,6 +81,16 @@ class Settings {
       'defaultToken'   => 'A',
     ];
     return wp_parse_args(get_option($this->option_key, []), $defaults);
+  }
+
+  /**
+   * Get current active provider.
+   *
+   * @return string Provider key
+   */
+  public function get_current_provider(): string {
+    $settings = $this->get_settings();
+    return $settings['activeProvider'] ?? 'lucide';
   }
 
   public function handle_purge(): void {
@@ -68,6 +112,111 @@ class Settings {
     delete_option($this->option_key);
     wp_safe_redirect(add_query_arg(['page' => 'acf-open-icons', 'restored' => 1], admin_url('edit.php?post_type=acf-field-group')));
     exit;
+  }
+
+  /**
+   * Detect provider changes and trigger migration.
+   *
+   * @param array $old_value Old settings value
+   * @param array $new_value New settings value
+   */
+  public function detect_provider_change($old_value, $new_value): void {
+    error_log('ACF Open Icons Migration: detect_provider_change called');
+
+    if (! $this->migration || ! current_user_can('manage_options')) {
+      error_log('ACF Open Icons Migration: Migration not available or insufficient permissions');
+      return;
+    }
+
+    // Use stored old value if available (captured during sanitization), otherwise use hook value
+    $old_value_to_use = $this->old_settings_value !== null ? $this->old_settings_value : $old_value;
+
+    // Handle both array and object formats
+    $old_value_to_use = is_array($old_value_to_use) ? $old_value_to_use : (array) $old_value_to_use;
+    $new_value = is_array($new_value) ? $new_value : (array) $new_value;
+
+    $old_provider = $old_value_to_use['activeProvider'] ?? 'lucide';
+    $new_provider = $new_value['activeProvider'] ?? 'lucide';
+    $new_version  = $new_value['pinnedVersion'] ?? 'latest';
+
+    error_log('ACF Open Icons Migration: Provider change detected - old: ' . $old_provider . ', new: ' . $new_provider . ', version: ' . $new_version);
+
+    // Only migrate if provider actually changed
+    if ($old_provider === $new_provider) {
+      error_log('ACF Open Icons Migration: Provider unchanged, skipping migration');
+      return;
+    }
+
+    // Run migration (no result storage needed - frontend will query status)
+    error_log('ACF Open Icons Migration: Starting migration...');
+    $results = $this->migration->migrate_icons($old_provider, $new_provider, $new_version);
+    error_log('ACF Open Icons Migration: Migration complete - matched: ' . ($results['matched_count'] ?? 0) . ', unmatched: ' . (isset($results['unmatched']) ? count($results['unmatched']) : 0) . ', total: ' . ($results['total_found'] ?? 0));
+  }
+
+  /**
+   * Detect color token changes and update stored icons.
+   *
+   * @param array $old_value Old settings value
+   * @param array $new_value New settings value
+   */
+  public function detect_color_token_changes($old_value, $new_value): void {
+    if (! $this->migration || ! current_user_can('manage_options')) {
+      return;
+    }
+
+    // Use stored old value if available (captured during sanitization), otherwise use hook value
+    $old_value_to_use = $this->old_settings_value !== null ? $this->old_settings_value : $old_value;
+
+    // Handle both array and object formats
+    $old_value_to_use = is_array($old_value_to_use) ? $old_value_to_use : (array) $old_value_to_use;
+    $new_value = is_array($new_value) ? $new_value : (array) $new_value;
+
+    $old_palette = $old_value_to_use['palette'] ?? [];
+    $new_palette = $new_value['palette'] ?? [];
+
+    // Build maps for easy comparison
+    $old_palette_map = [];
+    if (is_array($old_palette)) {
+      foreach ($old_palette as $item) {
+        if (isset($item['token']) && isset($item['hex'])) {
+          $old_palette_map[$item['token']] = $item['hex'];
+        }
+      }
+    }
+
+    $new_palette_map = [];
+    if (is_array($new_palette)) {
+      foreach ($new_palette as $item) {
+        if (isset($item['token']) && isset($item['hex'])) {
+          $new_palette_map[$item['token']] = $item['hex'];
+        }
+      }
+    }
+
+    // Find tokens that changed
+    $changed_tokens = [];
+    foreach ($new_palette_map as $token => $new_hex) {
+      $old_hex = $old_palette_map[$token] ?? null;
+      if ($old_hex !== null && $old_hex !== $new_hex) {
+        $changed_tokens[] = $token;
+        error_log('ACF Open Icons: Color token ' . $token . ' changed from ' . $old_hex . ' to ' . $new_hex);
+      }
+    }
+
+    // Also check for tokens that were removed (though this is less common)
+    foreach ($old_palette_map as $token => $old_hex) {
+      if (! isset($new_palette_map[$token])) {
+        error_log('ACF Open Icons: Color token ' . $token . ' was removed');
+        // We could handle this, but for now we'll skip removed tokens
+      }
+    }
+
+    // Update icons if any tokens changed
+    if (! empty($changed_tokens)) {
+      error_log('ACF Open Icons: Updating icons for ' . count($changed_tokens) . ' changed color tokens');
+      $results = $this->migration->update_icons_by_color_tokens($changed_tokens);
+      error_log('ACF Open Icons: Updated ' . ($results['updated_count'] ?? 0) . ' icons for changed color tokens');
+    }
   }
 
   public function render_page(): void {

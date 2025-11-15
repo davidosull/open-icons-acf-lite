@@ -1,5 +1,73 @@
 # Changelog
 
+## [0.3.0] - 2024
+
+### Added
+
+#### Features
+
+- **Icon Migration Tool**: Complete icon migration system for switching between icon providers (e.g., Heroicons to Lucide, Tabler Icons, etc.).
+
+  - **Automatic Migration**: When changing the active icon provider in settings, icons with matching names are automatically migrated to the new provider
+  - **Manual Migration**: Icons without exact name matches appear in a migration tool where users can manually select replacement icons
+  - **Migration Status**: Real-time status showing which icons need migration, grouped by provider and icon key
+  - **Bulk Operations**: "Migrate All" button to migrate multiple selected icons at once with a single summary notification
+  - **Visual Preview**: Side-by-side preview of old and new icons in the migration tool
+  - **Smart Detection**: Finds icons across all WordPress meta types (post_meta, options, usermeta, termmeta) and excludes post revisions
+  - **Color Preservation**: Migrated icons preserve their original color tokens and apply the correct color to the new icon
+
+- **Automatic Color Token Updates**: When color tokens are changed in settings, all stored icons using those tokens are automatically updated with the new color values. This ensures consistency between stored icons and current color settings.
+
+- **Fill/Stroke Detection**: Intelligent color application that detects whether icons use `fill` or `stroke` attributes (or both), ensuring consistent color rendering across different icon set structures (e.g., Heroicons solid uses fill, while outline versions use stroke).
+
+  - Applied consistently in both backend (PHP) and frontend (React) code
+  - Uses negative lookahead regex to avoid incorrectly matching attributes like `stroke-width`, `fill-opacity`, etc.
+  - Handles edge cases like `fill="none"` correctly
+
+- **Loading State Indicators**: Added loading spinner when icon SVG is being fetched, providing immediate visual feedback that an icon selection is in progress.
+
+#### UX Improvements
+
+- **"Use Last Color" as Default**: Changed "Use Last Color" behavior from forced to default. The last used color is now suggested as the default when opening the picker, but users can freely change it. This allows flexibility when working with multiple colors in the same repeater field.
+
+- **Provider-Aware Icon Picker**: Icon picker now always displays icons from the current active provider, regardless of which provider was used for existing icons. This ensures users see the correct icon set when selecting new icons.
+
+- **Improved Modal Performance**: Implemented `flushSync` for faster modal closing, providing immediate visual feedback when selecting icons.
+
+### Fixed
+
+- **Icon Preview on Selection**: Fixed issue where icons in loading state weren't showing in the preview. Icons now display a loading spinner immediately, then update to show the actual icon once the SVG is loaded.
+
+- **Color Application Consistency**: Fixed inconsistencies between backend and frontend color application. Both now use the same logic for detecting and applying colors to fill/stroke attributes.
+
+- **Provider Display**: Fixed issue where icon picker modal would show incorrect library name (e.g., showing "Lucide" when using Tabler Icons). Modal now correctly displays the active provider name.
+
+- **Migration Tool Visibility**: Fixed migration tool not appearing after changing provider settings. Tool now correctly detects and displays when icons need migration.
+
+- **Post Revision Exclusion**: Fixed migration tool finding icons stored in post revisions. Now only searches the latest versions of posts.
+
+- **Color Token Respect**: Fixed migrated icons not respecting their original color tokens. Migrated icons now correctly apply the stored color token to the new icon.
+
+### Changed
+
+- **"Use Last Color" Behavior**: Changed from forcing the last color to using it as a default that can be overridden. Users can now select different colors for different icons in the same repeater field while still benefiting from the convenience of the default.
+
+- **Migration Tool UI**: Improved styling and layout of the migration tool to match other sections of the settings page for consistency.
+
+- **Toast Notifications**: Changed from individual toasts per icon to a single summary toast when using "Migrate All" functionality.
+
+### Technical Improvements
+
+- **REST API Endpoints**: Added `/migration/status` and `/migration/migrate-icon` endpoints for migration functionality.
+
+- **Color Application Logic**: Unified color application logic across PHP and TypeScript, ensuring consistent behavior between backend storage and frontend display.
+
+- **SVG Attribute Parsing**: Improved regex patterns for SVG attribute manipulation with negative lookahead/lookbehind to prevent incorrect matches.
+
+- **State Management**: Improved React state management for migration tool, preventing cross-contamination between different icon groups.
+
+---
+
 ## [0.2.0] - 2024
 
 ### Added

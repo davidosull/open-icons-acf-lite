@@ -178,6 +178,7 @@ function mountPickers() {
             '[data-acfoi-color-token-out]'
           ) as HTMLInputElement;
 
+          // Always update the key input (even if SVG is not yet available)
           if (currentInputKey) {
             currentInputKey.value = item.key;
             currentInputKey.dispatchEvent(
@@ -195,12 +196,46 @@ function mountPickers() {
             );
           }
 
+          // If SVG is not available yet, show a loading state in the preview
+          if (currentPreview && !item.svg && item.key) {
+            // Show a placeholder or loading indicator
+            currentPreview.innerHTML = '<div style="width:16px;height:16px;border:2px solid #ddd;border-top-color:#333;border-radius:50%;animation:spin 1.2s linear infinite;"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+            // Remove display:none from style and ensure display:flex is set
+            const styleAttr = currentPreview.getAttribute('style') || '';
+            const styleParts = styleAttr.split(';').filter((s) => {
+              const trimmed = s.trim();
+              return trimmed && !trimmed.toLowerCase().startsWith('display');
+            });
+            styleParts.push(
+              'display:flex',
+              'align-items:center',
+              'justify-content:center'
+            );
+            const newStyle = styleParts.join(';') + ';';
+            currentPreview.setAttribute('style', newStyle);
+          }
+
+          // Helper function to apply color to SVG (matches IconPicker logic)
+          const applyColorToSvg = (svg: string, color: string): string => {
+            if (!svg || !color) return svg;
+            // Detect if icon uses fill or stroke (or both)
+            const hasStroke = /\bstroke(?!-)\s*=/i.test(svg);
+            const hasFill = /\bfill(?!-)\s*=/i.test(svg) && !/fill\s*=\s*["']none["']/i.test(svg);
+            let result = svg;
+            // Apply color to stroke if present
+            if (hasStroke) {
+              result = result.replace(/\bstroke(?!-)\s*=\s*["']?[^"'\s>]*["']?/gi, `stroke="${color}"`);
+            }
+            // Apply color to fill if present and not explicitly set to "none"
+            if (hasFill) {
+              result = result.replace(/\bfill(?!-)\s*=\s*["']?[^"'\s>]*["']?/gi, `fill="${color}"`);
+            }
+            return result;
+          };
+
           if (currentInputSvg && item.svg) {
             const colored = item.color?.hex || '#111111';
-            const svgWithColor = item.svg.replace(
-              /stroke="[^"]*"/g,
-              `stroke="${colored}"`
-            );
+            const svgWithColor = applyColorToSvg(item.svg, colored);
             currentInputSvg.value = svgWithColor;
             currentInputSvg.dispatchEvent(
               new Event('input', { bubbles: true })
@@ -210,12 +245,10 @@ function mountPickers() {
             );
           }
 
+          // Update preview if SVG is available (even if called asynchronously after modal closes)
           if (currentPreview && item.svg) {
             const colored = item.color?.hex || '#111111';
-            const svgWithColor = item.svg.replace(
-              /stroke="[^"]*"/g,
-              `stroke="${colored}"`
-            );
+            const svgWithColor = applyColorToSvg(item.svg, colored);
             currentPreview.innerHTML = svgWithColor;
 
             // Remove display:none from style and ensure display:flex is set

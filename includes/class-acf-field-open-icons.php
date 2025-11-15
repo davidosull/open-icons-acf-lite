@@ -49,7 +49,10 @@ class ACF_Field_Open_Icons extends \acf_field {
     $value   = is_array($field['value'] ?? null) ? $field['value'] : [];
     $stored  = $value['svg'] ?? '';
     $refKey  = esc_attr($value['iconKey'] ?? '');
-    // If no icon selected yet, fall back to current settings for provider/version
+    // For the picker modal, always use current active provider/version (so users see current icon set)
+    // For stored values, use stored provider/version if icon exists, otherwise use current settings
+    $pickerProv = esc_attr($settings['activeProvider']); // Always use current for picker
+    $pickerVer  = esc_attr($settings['pinnedVersion']); // Always use current for picker
     $refProv = esc_attr((!empty($refKey) && isset($value['provider'])) ? $value['provider'] : $settings['activeProvider']);
     $refVer  = esc_attr((!empty($refKey) && isset($value['version'])) ? $value['version'] : $settings['pinnedVersion']);
     $field_name = esc_attr($field['name']);
@@ -85,8 +88,8 @@ class ACF_Field_Open_Icons extends \acf_field {
     $field_key = esc_attr($field['key'] ?? '');
 ?>
     <div class="acfoi-field" id="<?php echo esc_attr($instance_id); ?>"
-      data-acfoi-provider="<?php echo $refProv; ?>"
-      data-acfoi-version="<?php echo $refVer; ?>"
+      data-acfoi-provider="<?php echo $pickerProv; ?>"
+      data-acfoi-version="<?php echo $pickerVer; ?>"
       data-acfoi-instance-id="<?php echo esc_attr($instance_id); ?>"
       data-acfoi-use-last-color="<?php echo $use_last_color; ?>"
       data-acfoi-field-key="<?php echo $field_key; ?>"

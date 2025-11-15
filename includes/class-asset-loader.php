@@ -215,6 +215,30 @@ JS;
     $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
     $defaultToken = $settings['defaultToken'] ?? 'A';
 
+    // Get library info for the active provider
+    $provider = $settings['activeProvider'] ?? 'lucide';
+    $manifestData = [];
+    $path = ACFOI_PLUGIN_DIR . 'includes/manifests/' . sanitize_file_name($provider) . '.php';
+    if (file_exists($path)) {
+      $manifestData = include $path;
+      if (! is_array($manifestData)) {
+        $manifestData = [];
+      }
+    }
+    $libraryUrl = $manifestData['library'] ?? 'https://lucide.dev/icons';
+    $providers = (new Providers())->all();
+    $providerLabel = $providers[$provider]['label'] ?? 'Lucide';
+
+    // Provide REST API settings for JavaScript (must be available before module scripts)
+    // Output directly in admin_head to ensure it's available early
+    add_action('admin_head', function () {
+      // Always output - don't check for wp-api script
+      echo '<script>window.wpApiSettings = window.wpApiSettings || ' . wp_json_encode([
+        'root' => esc_url_raw(rest_url()),
+        'nonce' => wp_create_nonce('wp_rest'),
+      ]) . ';</script>' . "\n";
+    }, 1);
+
     if (self::is_dev_mode()) {
       self::enqueue_vite_client_with_preamble();
       wp_enqueue_script(
@@ -225,8 +249,8 @@ JS;
         true
       );
       self::ensure_module_script_filter();
-      add_action('admin_footer', function () use ($palette, $defaultToken) {
-        echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . ';</script>' . "\n";
+      add_action('admin_footer', function () use ($palette, $defaultToken, $libraryUrl, $providerLabel) {
+        echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };</script>' . "\n";
       }, 5);
     } else {
       $manifest_path = ACFOI_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
@@ -273,8 +297,14 @@ JS;
       // Ensure type="module" for Vite production output
       self::ensure_module_script_filter();
 
-      // Provide palette info before the module executes
-      wp_add_inline_script('acfoi-settings', 'window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . ';', 'before');
+      // Provide REST API settings (also output in admin_head for dev mode, but ensure it's here too)
+      wp_localize_script('acfoi-settings', 'wpApiSettings', [
+        'root' => esc_url_raw(rest_url()),
+        'nonce' => wp_create_nonce('wp_rest'),
+      ]);
+
+      // Provide palette and library info before the module executes
+      wp_add_inline_script('acfoi-settings', 'window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };', 'before');
       wp_enqueue_script('acfoi-settings');
     }
   }
