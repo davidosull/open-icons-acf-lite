@@ -11,6 +11,9 @@ import { ColorPicker } from './components/ui/color-picker';
 import { useToaster } from './components/ui/toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './components/ui/dialog';
 import { Alert, AlertTitle, AlertDescription } from './components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { Badge } from './components/ui/badge';
+import { Separator } from './components/ui/separator';
 import IconPicker from './components/IconPicker';
 
 function SettingsUI({
@@ -68,27 +71,169 @@ function SettingsUI({
   const [oldIconSvg, setOldIconSvg] = React.useState<Record<string, string>>({});
   const [migratingIcons, setMigratingIcons] = React.useState<Record<string, boolean>>({});
 
+  // License state
+  const [licenseStatus, setLicenseStatus] = React.useState<any>(null);
+  const [loadingLicense, setLoadingLicense] = React.useState(false);
+  const [licenseKey, setLicenseKey] = React.useState('');
+  const [activatingLicense, setActivatingLicense] = React.useState(false);
+  const [deactivatingLicense, setDeactivatingLicense] = React.useState(false);
+  const [updateAvailable, setUpdateAvailable] = React.useState<any>(null);
+
   const restBase = (window as any).wpApiSettings?.root?.replace(/\/$/, '') || '/wp-json';
   const nonce = (window as any).wpApiSettings?.nonce || '';
 
-  // Debug: Log wpApiSettings availability
+  // Fetch license status
+  const fetchLicenseStatus = React.useCallback(async () => {
+    setLoadingLicense(true);
+    try {
+      const url = `${restBase}/acf-open-icons/v1/license`;
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'X-WP-Nonce': nonce,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLicenseStatus(data);
+      }
+    } catch (error) {
+      // Error fetching license status
+    } finally {
+      setLoadingLicense(false);
+    }
+  }, [restBase, nonce]);
+
+  // Load license status on mount
   React.useEffect(() => {
-    console.log('[Migration Debug] wpApiSettings check:', {
-      exists: !!(window as any).wpApiSettings,
-      root: (window as any).wpApiSettings?.root,
-      nonce: (window as any).wpApiSettings?.nonce ? 'present' : 'missing',
-      nonceLength: (window as any).wpApiSettings?.nonce?.length || 0,
-    });
-  }, []);
+    fetchLicenseStatus();
+  }, [fetchLicenseStatus]);
+
+  // Activate license
+  const handleActivateLicense = React.useCallback(async () => {
+    if (!licenseKey.trim()) {
+      push({
+        type: 'error',
+        title: 'Error',
+        message: 'Please enter a license key',
+      });
+      return;
+    }
+
+    setActivatingLicense(true);
+    try {
+      const url = `${restBase}/acf-open-icons/v1/license/activate`;
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': nonce,
+        },
+        body: JSON.stringify({ license_key: licenseKey.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        push({
+          type: 'success',
+          title: 'License Activated',
+          message: data.message || 'License activated successfully',
+        });
+        setLicenseKey('');
+        await fetchLicenseStatus();
+      } else {
+        push({
+          type: 'error',
+          title: 'Activation Failed',
+          message: data.message || 'Failed to activate license',
+        });
+      }
+    } catch (error) {
+      push({
+        type: 'error',
+        title: 'Error',
+        message: 'An error occurred while activating the license',
+      });
+    } finally {
+      setActivatingLicense(false);
+    }
+  }, [licenseKey, restBase, nonce, push, fetchLicenseStatus]);
+
+  // Deactivate license
+  const handleDeactivateLicense = React.useCallback(async () => {
+    setDeactivatingLicense(true);
+    try {
+      const url = `${restBase}/acf-open-icons/v1/license/deactivate`;
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'X-WP-Nonce': nonce,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        push({
+          type: 'success',
+          title: 'License Deactivated',
+          message: data.message || 'License deactivated successfully',
+        });
+        await fetchLicenseStatus();
+      } else {
+        push({
+          type: 'error',
+          title: 'Deactivation Failed',
+          message: data.message || 'Failed to deactivate license',
+        });
+      }
+    } catch (error) {
+      push({
+        type: 'error',
+        title: 'Error',
+        message: 'An error occurred while deactivating the license',
+      });
+    } finally {
+      setDeactivatingLicense(false);
+    }
+  }, [restBase, nonce, push, fetchLicenseStatus]);
+
+  // Format date
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Get status badge variant
+  const getStatusBadgeVariant = (status: string): 'default' | 'secondary' | 'success' | 'warning' | 'error' => {
+    switch (status) {
+      case 'active':
+        return 'success';
+      case 'grace_period':
+        return 'warning';
+      case 'expired':
+        return 'error';
+      default:
+        return 'secondary';
+    }
+  };
+
 
   // Fetch migration status
   const fetchMigrationStatus = React.useCallback(async (providerOverride?: string) => {
-    console.log('[Migration Debug] fetchMigrationStatus called', {
-      providerOverride,
-      restBase,
-      nonce: nonce ? 'present (' + nonce.length + ' chars)' : 'missing',
-      wpApiSettings: !!(window as any).wpApiSettings,
-    });
     setLoadingMigrationStatus(true);
     try {
       // Always use the saved provider from the API, not the selected one
@@ -96,7 +241,6 @@ function SettingsUI({
       // If providerOverride is provided (when provider changes), we still want to see
       // what icons exist from OTHER providers, so we don't pass it to the API
       const url = `${restBase}/acf-open-icons/v1/migration/status`;
-      console.log('[Migration Debug] Fetching migration status from:', url, '(providerOverride ignored - API uses saved provider)');
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -106,31 +250,19 @@ function SettingsUI({
         headers['X-WP-Nonce'] = nonce;
       }
 
-      console.log('[Migration Debug] Request headers:', headers);
-
       const response = await fetch(url, {
         method: 'GET',
         credentials: 'include', // Include cookies for authentication
         headers,
       });
-      console.log('[Migration Debug] Response status:', response.status, response.ok);
       if (response.ok) {
         const data = await response.json();
-        console.log('[Migration Debug] Migration status data received:', {
-          current_provider: data.current_provider,
-          total: data.total,
-          non_current_count: data.non_current?.length || 0,
-          grouped_by_icon_keys: Object.keys(data.grouped_by_icon || {}),
-          by_provider_keys: Object.keys(data.by_provider || {}),
-          full_data: data,
-        });
         setMigrationStatus(data);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[Migration Debug] Response error:', response.status, errorData);
+        await response.json().catch(() => ({}));
       }
     } catch (error) {
-      console.error('[Migration Debug] Fetch error:', error);
+      // Fetch error
     } finally {
       setLoadingMigrationStatus(false);
     }
@@ -138,14 +270,12 @@ function SettingsUI({
 
   // Load migration status on mount and after migrations
   React.useEffect(() => {
-    console.log('[Migration Debug] Initial mount - fetching migration status');
     fetchMigrationStatus();
   }, [fetchMigrationStatus]);
 
   // Fetch migration status when provider changes (to show what would need migration)
   React.useEffect(() => {
     if (provider !== originalProvider) {
-      console.log('[Migration Debug] Provider changed - fetching status for new provider:', provider);
       // Don't pass providerOverride - let API use saved provider to find non-current icons
       fetchMigrationStatus();
     }
@@ -158,9 +288,7 @@ function SettingsUI({
       // Check if we just saved (settings page might redirect or reload)
       // Also check periodically after mount in case of redirect
       if (url.searchParams.has('settings-updated') || url.searchParams.has('migrated')) {
-        console.log('[Migration Debug] Settings saved - refreshing migration status after delay');
         setTimeout(() => {
-          console.log('[Migration Debug] Delayed refresh executing');
           fetchMigrationStatus();
         }, 500);
       }
@@ -259,9 +387,7 @@ function SettingsUI({
       url.searchParams.delete('settings-updated');
       window.history.replaceState({}, '', url.toString());
       // Refresh migration status after save
-      console.log('[Migration Debug] Settings saved - refreshing migration status after delay');
       setTimeout(() => {
-        console.log('[Migration Debug] Delayed refresh executing');
         fetchMigrationStatus();
       }, 500);
     } else if (ss === 'settings_saved') {
@@ -270,9 +396,7 @@ function SettingsUI({
         title: 'Saved',
         message: 'Settings updated.',
       });
-      console.log('[Migration Debug] Settings saved (sessionStorage) - refreshing migration status after delay');
       setTimeout(() => {
-        console.log('[Migration Debug] Delayed refresh executing (sessionStorage)');
         fetchMigrationStatus();
       }, 500);
     }
@@ -322,39 +446,31 @@ function SettingsUI({
       // Get provider from icon.value.provider
       const oldProvider = icons[0]?.value?.provider || icons[0]?.provider;
       if (!oldProvider || oldProvider === 'unknown') {
-        console.log('[Migration Debug] Skipping icon fetch - no provider:', iconKey, icons[0]);
         return;
       }
 
-      console.log('[Migration Debug] Fetching old icon:', iconKey, 'from provider:', oldProvider);
       const url = `${restBase}/acf-open-icons/v1/icon?provider=${encodeURIComponent(oldProvider)}&version=latest&key=${encodeURIComponent(iconKey)}`;
       fetch(url)
         .then((r) => {
           if (!r.ok) {
-            console.error('[Migration Debug] Failed to fetch old icon:', r.status, iconKey, oldProvider);
             return null;
           }
           return r.text();
         })
         .then((svg) => {
           if (svg) {
-            console.log('[Migration Debug] Successfully fetched old icon:', iconKey);
             setOldIconSvg((prev) => ({ ...prev, [iconKey]: svg }));
           }
         })
-        .catch((err) => {
-          console.error('[Migration Debug] Error fetching old icon:', iconKey, err);
+        .catch(() => {
+          // Error fetching old icon
         });
     });
   }, [migrationStatus, restBase]);
 
   // Migration functions
   const handleIconSelected = React.useCallback((item: {key: string; svg?: string}) => {
-    const startTime = performance.now();
-    console.log('[Migration Debug] handleIconSelected called', { itemKey: item.key, migratingIconKey, hasSvg: !!item.svg });
-
     if (!migratingIconKey) {
-      console.log('[Migration Debug] No migratingIconKey, returning early');
       return;
     }
 
@@ -362,9 +478,6 @@ function SettingsUI({
     const iconKeyToMigrate = migratingIconKey;
 
     // Close picker FIRST to ensure immediate visual feedback
-    console.log('[Migration Debug] Closing picker immediately...');
-    const closeStart = performance.now();
-
     // Use flushSync to force immediate React update and visual close
     flushSync(() => {
       setShowIconPicker(false);
@@ -372,40 +485,28 @@ function SettingsUI({
       setMigrationInstances([]);
     });
 
-    const closeEnd = performance.now();
-    console.log('[Migration Debug] Picker closed with flushSync in', (closeEnd - closeStart).toFixed(2), 'ms');
-
     // Update selectedIcons immediately after close (don't wait for next frame)
-    console.log('[Migration Debug] Updating selectedIcons state...');
-    const stateUpdateStart = performance.now();
-
     // Store selection for this specific icon key
     setSelectedIcons((prev) => ({
       ...prev,
       [iconKeyToMigrate]: { key: item.key, svg: item.svg }
     }));
 
-    const stateUpdateEnd = performance.now();
-    console.log('[Migration Debug] State update completed in', (stateUpdateEnd - stateUpdateStart).toFixed(2), 'ms');
-    console.log('[Migration Debug] Total handleIconSelected time:', (stateUpdateEnd - startTime).toFixed(2), 'ms');
-
     // Fetch SVG in background if not provided
     if (!item.svg) {
-      console.log('[Migration Debug] Fetching SVG in background for:', item.key);
       const currentProvider = migrationStatus?.current_provider || provider;
       const currentVersion = versionEl?.value || 'latest';
       const url = `${restBase}/acf-open-icons/v1/icon?provider=${encodeURIComponent(currentProvider)}&version=${encodeURIComponent(currentVersion)}&key=${encodeURIComponent(item.key)}`;
       fetch(url)
         .then((r) => r.text())
         .then((svg) => {
-          console.log('[Migration Debug] Background SVG fetch completed for:', item.key);
           setSelectedIcons((prev) => ({
             ...prev,
             [iconKeyToMigrate]: { key: item.key, svg }
           }));
         })
-        .catch((err) => {
-          console.error('[Migration Debug] Background SVG fetch failed:', err);
+        .catch(() => {
+          // Background SVG fetch failed
         });
     }
   }, [migratingIconKey, migrationStatus, provider, versionEl, restBase]);
@@ -414,8 +515,6 @@ function SettingsUI({
     if (!newIconKey) {
       return { success: false, migratedCount: 0, error: 'No new icon key provided' };
     }
-
-    console.log('[Migration Debug] handleMigrateIcon called', { oldIconKey, newIconKey, suppressToast });
 
     // Set loading state for this specific icon
     setMigratingIcons((prev) => ({ ...prev, [oldIconKey]: true }));
@@ -431,9 +530,6 @@ function SettingsUI({
         newVersion: currentVersion,
       };
 
-      console.log('[Migration Debug] Sending migration request...', requestBody);
-      const requestStart = performance.now();
-
       const response = await fetch(`${restBase}/acf-open-icons/v1/migration/migrate-icon`, {
         method: 'POST',
         headers: {
@@ -443,11 +539,7 @@ function SettingsUI({
         body: JSON.stringify(requestBody),
       });
 
-      const requestEnd = performance.now();
-      console.log('[Migration Debug] Migration request completed in', (requestEnd - requestStart).toFixed(2), 'ms');
-
       const data = await response.json();
-      console.log('[Migration Debug] Migration response:', data);
 
       if (response.ok && data.ok) {
         if (!suppressToast) {
@@ -472,9 +564,7 @@ function SettingsUI({
 
         // Refresh migration status (no page reload) - only if not suppressing toast (single migration)
         if (!suppressToast) {
-          console.log('[Migration Debug] Refreshing migration status...');
           await fetchMigrationStatus();
-          console.log('[Migration Debug] Migration status refreshed');
         }
 
         return { success: true, migratedCount: data.migrated_count || 0 };
@@ -489,7 +579,6 @@ function SettingsUI({
         return { success: false, migratedCount: 0, error: data.message || 'Failed to migrate icon' };
       }
     } catch (error) {
-      console.error('[Migration Debug] Migration error:', error);
       if (!suppressToast) {
         push({
           type: 'error',
@@ -522,29 +611,127 @@ function SettingsUI({
   // Show migration section if there are non-current icons OR if provider changed (to show what would need migration)
   const hasNonCurrentIcons = (migrationStatus?.non_current && migrationStatus.non_current.length > 0) || providerChanged;
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('[Migration Debug] State update:', {
-      provider,
-      originalProvider,
-      providerChanged,
-      migrationStatus: migrationStatus ? {
-        current_provider: migrationStatus.current_provider,
-        total: migrationStatus.total,
-        non_current_count: migrationStatus.non_current?.length || 0,
-        grouped_by_icon_count: Object.keys(migrationStatus.grouped_by_icon || {}).length,
-      } : null,
-      hasNonCurrentIcons,
-      loadingMigrationStatus,
-    });
-  }, [provider, originalProvider, providerChanged, migrationStatus, hasNonCurrentIcons, loadingMigrationStatus]);
+  // Check if license is valid (active or grace period)
+  const isLicenseValid = licenseStatus?.status === 'active' || licenseStatus?.status === 'grace_period';
 
   return (
     <div className='acfoi-settings-ui mt-3'>
       <div ref={toastRef} />
       {portal}
       <div className='space-y-6 max-w-[576px]'>
-        <div className='rounded-md border bg-white p-4'>
+        {/* License Section - Always visible */}
+        <Card>
+          <CardHeader>
+            <CardTitle>License</CardTitle>
+            <CardDescription>
+              Manage your ACF Open Icons license
+            </CardDescription>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            {loadingLicense ? (
+              <p className='text-sm text-gray-600'>Loading license status...</p>
+            ) : licenseStatus?.license_key ? (
+              <>
+                <div className='space-y-4'>
+                  <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
+                    <Label>Status</Label>
+                    <div>
+                      <Badge variant={getStatusBadgeVariant(licenseStatus.status || 'invalid')}>
+                        {licenseStatus.status === 'active' ? 'Active' :
+                         licenseStatus.status === 'grace_period' ? 'Grace Period' :
+                         licenseStatus.status === 'expired' ? 'Expired' : 'Invalid'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className='grid gap-3'>
+                    <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
+                      <Label>Purchase Date</Label>
+                      <span className='text-sm'>{formatDate(licenseStatus.purchase_date)}</span>
+                    </div>
+                    <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
+                      <Label>Billing Cycle</Label>
+                      <span className='text-sm capitalize'>{licenseStatus.billing_cycle || 'N/A'}</span>
+                    </div>
+                    <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
+                      <Label>Next Payment</Label>
+                      <span className='text-sm'>{formatDate(licenseStatus.next_payment)}</span>
+                    </div>
+                    <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
+                      <Label>Expires</Label>
+                      <span className='text-sm'>{formatDate(licenseStatus.expires_at)}</span>
+                    </div>
+                  </div>
+                  {licenseStatus.status === 'grace_period' && (
+                    <Alert variant='warning'>
+                      <AlertTitle>Grace Period</AlertTitle>
+                      <AlertDescription>
+                        Your license has expired. You have a 7-day grace period to renew.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {licenseStatus.status === 'expired' && (
+                    <Alert variant='error'>
+                      <AlertTitle>License Expired</AlertTitle>
+                      <AlertDescription>
+                        Your license has expired. Please renew to continue using the plugin.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <div className='pt-2'>
+                  <Button
+                    onClick={handleDeactivateLicense}
+                    variant='secondary'
+                    disabled={deactivatingLicense}
+                  >
+                    {deactivatingLicense ? 'Deactivating...' : 'Deactivate License'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className='space-y-4'>
+                <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
+                  <Label htmlFor='license-key'>License Key</Label>
+                  <Input
+                    id='license-key'
+                    value={licenseKey}
+                    onChange={(e) => setLicenseKey(e.target.value)}
+                    placeholder='Enter your license key'
+                  />
+                </div>
+                <div className='pt-2'>
+                  <Button
+                    onClick={handleActivateLicense}
+                    variant='primary'
+                    disabled={activatingLicense || !licenseKey.trim()}
+                  >
+                    {activatingLicense ? 'Activating...' : 'Activate License'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Show warning if license is not valid (only show if no license key or expired, not for grace period) */}
+        {!licenseStatus?.license_key || licenseStatus?.status === 'expired' ? (
+          <Alert variant={!licenseStatus?.license_key ? 'warning' : 'error'}>
+            <AlertTitle>
+              {!licenseStatus?.license_key ? 'License Required' : 'License Expired'}
+            </AlertTitle>
+            <AlertDescription>
+              {!licenseStatus?.license_key
+                ? 'Please activate your license to access settings and use the icon picker.'
+                : 'Your license has expired. Please renew your license to access settings and use the icon picker.'}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        {/* Settings sections - Only show if license is valid */}
+        {isLicenseValid && (
+          <>
+            <div className='rounded-md border bg-white p-4'>
           <div className='grid gap-4'>
             <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
               <Label>Icon Set</Label>
@@ -622,8 +809,8 @@ function SettingsUI({
           </div>
         </div>
 
-        {/* Migration Section - Show if there are non-current provider icons OR if provider changed */}
-        {(hasNonCurrentIcons || loadingMigrationStatus) && (
+            {/* Migration Section - Show if there are non-current provider icons OR if provider changed */}
+            {(hasNonCurrentIcons || loadingMigrationStatus) && (
           <div className='rounded-md border bg-white p-4 space-y-4'>
             <div className='flex items-center justify-between'>
               <Label className='text-base font-semibold'>Icon Migration</Label>
@@ -635,7 +822,6 @@ function SettingsUI({
                       e.preventDefault();
                       e.stopPropagation();
                       const iconsToMigrate = Object.entries(selectedIcons);
-                      console.log('[Migration Debug] Migrate All clicked', iconsToMigrate.length, 'icons');
 
                       const results: Array<{oldIconKey: string; newIconKey: string; success: boolean; migratedCount: number; error?: string}> = [];
 
@@ -885,35 +1071,37 @@ function SettingsUI({
               )}
             </div>
           </div>
-        )}
+            )}
 
-        <div className='flex items-center gap-3'>
-          <Button onClick={() => form.requestSubmit()} variant='primary'>
-            Save Changes
-          </Button>
-          {purgeForm && (
-            <Button
-              onClick={() => purgeForm.requestSubmit()}
-              variant='secondary'
-            >
-              Purge Icon Cache
-            </Button>
-          )}
-          <Button
-            onClick={() => {
-              const restoreForm = document
-                .querySelector(
-                  'form input[name="action"][value="acfoi_restore_defaults"]'
-                )
-                ?.closest('form') as HTMLFormElement | null;
-              if (restoreForm) restoreForm.requestSubmit();
-            }}
-            variant='secondary'
-            className='border-red-200 text-red-700 hover:bg-red-50'
-          >
-            Restore Defaults
-          </Button>
-        </div>
+            <div className='flex items-center gap-3'>
+              <Button onClick={() => form.requestSubmit()} variant='primary'>
+                Save Changes
+              </Button>
+              {purgeForm && (
+                <Button
+                  onClick={() => purgeForm.requestSubmit()}
+                  variant='secondary'
+                >
+                  Purge Icon Cache
+                </Button>
+              )}
+              <Button
+                onClick={() => {
+                  const restoreForm = document
+                    .querySelector(
+                      'form input[name="action"][value="acfoi_restore_defaults"]'
+                    )
+                    ?.closest('form') as HTMLFormElement | null;
+                  if (restoreForm) restoreForm.requestSubmit();
+                }}
+                variant='secondary'
+                className='border-red-200 text-red-700 hover:bg-red-50'
+              >
+                Restore Defaults
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Migration Icon Picker Dialog */}
@@ -921,7 +1109,6 @@ function SettingsUI({
         <IconPicker
           open={showIconPicker}
           onOpenChange={(open) => {
-            console.log('[Migration Debug] IconPicker onOpenChange called', { open, migratingIconKey });
             setShowIconPicker(open);
             if (!open) {
               // Clear migration state when closing

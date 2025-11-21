@@ -55,11 +55,12 @@ const excludePatterns = [
   '.idea',
 ];
 
-// Production files (only acf-open-icons.php, includes/, assets/)
+// Production files (only acf-open-icons.php, includes/, assets/, USAGE_EXAMPLE.md)
 const productionFiles = [
   'acf-open-icons.php',
   'includes',
   'assets',
+  'USAGE_EXAMPLE.md',
 ];
 
 // Helper function to check if a path should be excluded

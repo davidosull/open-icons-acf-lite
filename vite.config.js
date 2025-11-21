@@ -12,7 +12,9 @@ export default defineConfig({
     outDir: 'assets/build',
     emptyOutDir: true,
     manifest: '.vite/manifest.json',
-    assetsDir: '', // Output assets directly to build dir, not build/assets/
+    assetsDir: '',
+    sourcemap: false,
+    minify: 'esbuild',
     rollupOptions: {
       input: {
         picker: resolve(__dirname, 'src/picker.tsx'),

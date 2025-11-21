@@ -158,26 +158,22 @@ JS;
 
       if (! file_exists($manifest_path)) {
         // Manifest doesn't exist - this is an error condition
-        error_log('ACF Open Icons: Manifest file not found at ' . $manifest_path);
         return;
       }
 
       $manifest_content = file_get_contents($manifest_path);
       if ($manifest_content === false) {
-        error_log('ACF Open Icons: Could not read manifest file at ' . $manifest_path);
         return;
       }
 
       $manifest = json_decode($manifest_content, true);
       if (json_last_error() !== JSON_ERROR_NONE || ! is_array($manifest)) {
-        error_log('ACF Open Icons: Invalid manifest JSON: ' . json_last_error_msg());
         return;
       }
 
       $entry = $manifest['src/picker.tsx'] ?? null;
 
       if (! is_array($entry) || empty($entry['file'])) {
-        error_log('ACF Open Icons: Entry point "src/picker.tsx" not found in manifest');
         return;
       }
 
@@ -258,26 +254,22 @@ JS;
 
       if (! file_exists($manifest_path)) {
         // Manifest doesn't exist - this is an error condition
-        error_log('ACF Open Icons: Manifest file not found at ' . $manifest_path);
         return;
       }
 
       $manifest_content = file_get_contents($manifest_path);
       if ($manifest_content === false) {
-        error_log('ACF Open Icons: Could not read manifest file at ' . $manifest_path);
         return;
       }
 
       $manifest = json_decode($manifest_content, true);
       if (json_last_error() !== JSON_ERROR_NONE || ! is_array($manifest)) {
-        error_log('ACF Open Icons: Invalid manifest JSON: ' . json_last_error_msg());
         return;
       }
 
       $entry = $manifest['src/settings.tsx'] ?? null;
 
       if (! is_array($entry) || empty($entry['file'])) {
-        error_log('ACF Open Icons: Entry point "src/settings.tsx" not found in manifest');
         return;
       }
 

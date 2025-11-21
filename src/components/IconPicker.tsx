@@ -856,45 +856,28 @@ export default function IconPicker({
   }
 
   async function pick(key: string) {
-    const startTime = performance.now();
-    console.log('[IconPicker Debug] pick() called for icon:', key);
-
     // Call onSelect immediately with cached SVG if available (non-blocking)
     const cachedSvg = cache[key];
-    console.log('[IconPicker Debug] Cached SVG available:', !!cachedSvg);
 
     addRecent(key);
     const color = { token: currentToken, hex: currentColor };
 
     // Close modal FIRST (before calling onSelect) to ensure immediate visual feedback
-    console.log('[IconPicker Debug] Closing modal immediately...');
-    const closeStart = performance.now();
-
     // Use flushSync to force immediate React update and visual close
     flushSync(() => {
       setOpen(false);
     });
 
-    const closeEnd = performance.now();
-    console.log('[IconPicker Debug] setOpen(false) called with flushSync in', (closeEnd - closeStart).toFixed(2), 'ms');
-
     // Call onSelect immediately after modal is closed (don't wait for next frame)
-    console.log('[IconPicker Debug] Calling onSelect callback...');
-    const onSelectStart = performance.now();
     onSelect({ key, svg: cachedSvg, color });
-    const onSelectEnd = performance.now();
-    console.log('[IconPicker Debug] onSelect callback completed in', (onSelectEnd - onSelectStart).toFixed(2), 'ms');
-    console.log('[IconPicker Debug] Total pick() execution time:', (onSelectEnd - startTime).toFixed(2), 'ms');
 
     // Fetch SVG in background if not cached (for preview purposes)
     if (!cachedSvg) {
-      console.log('[IconPicker Debug] Fetching SVG in background for:', key);
       ensureSvg(key).then((svg) => {
-        console.log('[IconPicker Debug] Background SVG fetch completed for:', key);
         // Update callback if needed, but don't block UI
         onSelect({ key, svg, color });
-      }).catch((err) => {
-        console.error('[IconPicker Debug] Background SVG fetch failed:', err);
+      }).catch(() => {
+        // Background SVG fetch failed
       });
     }
 

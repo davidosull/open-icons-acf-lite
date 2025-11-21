@@ -45,14 +45,8 @@ function acf_open_icon($value = null, $atts = []) {
   if (! empty($value['svg'])) {
     $svg = $value['svg'];
 
-    // Debug: Log original SVG before any processing
-    error_log('ACF Open Icons: Original stored SVG (first 500 chars): ' . substr($svg, 0, 500));
-
     // Only apply color override if explicitly provided
     if (! empty($atts['color'])) {
-      // Debug: Log before regex
-      error_log('ACF Open Icons: Applying color override: ' . $atts['color']);
-      error_log('ACF Open Icons: SVG before color regex (first 500 chars): ' . substr($svg, 0, 500));
 
       // Detect if icon uses fill or stroke (or both)
       // Some icon sets (e.g., Heroicons solid) use fill, others use stroke
@@ -70,9 +64,6 @@ function acf_open_icon($value = null, $atts = []) {
         // Use negative lookahead to avoid matching fill-opacity, fill-rule, etc.
         $svg = preg_replace('/\bfill(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'fill="' . esc_attr($atts['color']) . '"', $svg);
       }
-
-      // Debug: Log after regex
-      error_log('ACF Open Icons: SVG after color regex (first 500 chars): ' . substr($svg, 0, 500));
     }
     // Otherwise, use stored SVG as-is (it should already have the correct color from colorToken)
   } elseif (! empty($value['colorToken']) && ! empty($value['provider']) && ! empty($iconKey)) {
@@ -134,17 +125,11 @@ function acf_open_icon($value = null, $atts = []) {
   if (preg_match('/<svg\s+([^>]*)>/i', $svg, $matches)) {
     $attributes = $matches[1];
 
-    // Debug: Log attributes before processing
-    error_log('ACF Open Icons: Extracted SVG attributes: ' . $attributes);
-
     // Remove width, height, and viewBox only from the SVG element's attributes
     // (not from child elements - they need to keep their dimensions)
     // Use negative lookbehind to avoid matching "width" in "stroke-width", "min-width", etc.
     $attributes = preg_replace('/(?<!-)\bwidth\s*=\s*["\'][^"\']*["\']/i', '', $attributes);
     $attributes = preg_replace('/(?<!-)\bheight\s*=\s*["\'][^"\']*["\']/i', '', $attributes);
-
-    // Debug: Log attributes after removing width/height
-    error_log('ACF Open Icons: Attributes after removing width/height: ' . $attributes);
 
     // Preserve viewBox if it exists (it's important for SVG scaling)
     $viewbox = '';
@@ -182,9 +167,6 @@ function acf_open_icon($value = null, $atts = []) {
     // Clean up extra spaces in attributes
     $attributes = preg_replace('/\s+/', ' ', trim($attributes));
 
-    // Debug: Log final attributes before reconstruction
-    error_log('ACF Open Icons: Final attributes before reconstruction: ' . $attributes);
-
     // Reconstruct the <svg> tag with new size, preserved viewBox, class, and other attributes
     $new_svg_tag = '<svg width="' . $size . '" height="' . $size . '"' . $viewbox . $class_attr;
     if (! empty($attributes)) {
@@ -192,14 +174,8 @@ function acf_open_icon($value = null, $atts = []) {
     }
     $new_svg_tag .= '>';
 
-    // Debug: Log reconstructed tag
-    error_log('ACF Open Icons: Reconstructed SVG tag: ' . $new_svg_tag);
-
     // Replace only the opening tag in the original SVG
     $svg = str_replace($matches[0], $new_svg_tag, $svg);
-
-    // Debug: Log final SVG
-    error_log('ACF Open Icons: Final SVG output (first 500 chars): ' . substr($svg, 0, 500));
   } else {
     // Fallback if no existing attributes - create minimal SVG tag
     $class_attr = '';
@@ -226,4 +202,3 @@ if (! function_exists('bic_icon')) {
     return acf_open_icon($value, $atts);
   }
 }
-

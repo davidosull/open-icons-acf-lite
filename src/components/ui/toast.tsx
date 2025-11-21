@@ -57,20 +57,18 @@ export function useToaster(inlineHost?: HTMLElement | null) {
           className={cn(
             'acfoi-toast',
             isInline ? 'w-full' : 'w-[300px] pointer-events-auto',
-            'rounded-lg border',
-            t.type === 'success' && 'bg-green-50 border-green-200',
-            t.type === 'error' && 'bg-red-50 border-red-200',
-            (!t.type || t.type === 'info') && 'bg-blue-50 border-blue-200'
+            'rounded-md border p-4',
+            t.type === 'success' && 'bg-green-50 border-green-200 text-green-800',
+            t.type === 'error' && 'bg-red-50 border-red-200 text-red-800',
+            (!t.type || t.type === 'info') && 'bg-blue-50 border-blue-200 text-blue-800'
           )}
         >
-          <div className='p-4'>
             {t.title && (
-              <div className='mb-1 text-sm font-semibold text-gray-900'>
+            <div className='mb-1 text-sm font-semibold'>
                 {t.title}
               </div>
             )}
-            <div className='text-sm text-gray-700'>{t.message}</div>
-          </div>
+          <div className='text-sm'>{t.message}</div>
         </div>
       ))}
     </div>

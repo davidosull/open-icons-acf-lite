@@ -1,5 +1,145 @@
 # Changelog
 
+## [1.0.0] - 2024
+
+### 🎉 Major Release - Production Ready
+
+This is the first stable production release of ACF Open Icons. The plugin has been thoroughly cleaned, documented, and optimized for production use.
+
+### Added
+
+- **Production Documentation**: Comprehensive README.md with installation, configuration, and usage instructions
+- **Testing Checklist**: Streamlined testing guide for quality assurance
+- **Usage Examples**: USAGE_EXAMPLE.md included in production builds for developer reference
+
+### Changed
+
+- **Build Optimization**: Switched to esbuild minification (faster, no external dependencies)
+- **Production Assets**: Source maps disabled, console.log statements removed, optimized bundle sizes
+- **Distribution**: Production ZIP files now include USAGE_EXAMPLE.md for user reference
+
+### Fixed
+
+- **Build Process**: Fixed build configuration to use esbuild instead of terser (no external dependency required)
+- **Version Synchronization**: Ensured consistent versioning across package.json, plugin header, and CHANGELOG
+
+### Code Quality
+
+- **Debug Code Removal**: Removed all debug `error_log()` statements from production code
+  - Cleaned `class-rest.php` (13 statements removed)
+  - Cleaned `class-migration.php` (28 statements removed)
+  - Cleaned `class-settings.php` (10 statements removed)
+  - Cleaned `helpers.php` (7 statements removed)
+  - Cleaned `class-asset-loader.php` (8 statements removed)
+- **Security Review**: Verified all security best practices (sanitization, escaping, prepared statements, nonces)
+- **Performance**: Reviewed and optimized asset loading, database queries, and caching
+
+### Documentation
+
+- **README.md**: Complete documentation covering:
+  - Features overview
+  - Requirements (WordPress, PHP, ACF)
+  - Installation instructions
+  - Configuration guide
+  - Usage examples
+  - License information
+  - Support details
+- **CHANGELOG.md**: Comprehensive version history
+- **TESTING_CHECKLIST.md**: Practical testing guide for quality assurance
+
+### Technical Improvements
+
+- **Production Build**: Optimized Vite configuration for production
+  - Source maps disabled
+  - esbuild minification
+  - Proper asset optimization
+- **File Structure**: Verified production ZIP contains only necessary files
+- **Version Management**: Automated version synchronization in build process
+
+### Migration Notes
+
+This release maintains full backward compatibility with version 0.6.0. No database migrations or breaking changes required.
+
+---
+
+## [0.6.0] - 2024
+
+### Changed
+
+- **Update Delivery System**: Replaced signed S3 URLs with proxy endpoint approach for simpler, more reliable update delivery.
+  - **Proxy Endpoint**: Updates now delivered via `/api/download` endpoint that validates licenses before streaming files
+  - **Simplified Architecture**: Removed complex signed URL generation and regeneration logic
+  - **Better Reliability**: No more URL expiry issues - proxy endpoint always provides fresh access
+  - **Lemon Squeezy Compatible**: Proxy endpoint works seamlessly with Lemon Squeezy direct download links
+
+### Technical Improvements
+
+- **Removed Signed URL Code**: Eliminated all signed URL generation and regeneration code from both licensing server and WordPress plugin
+- **Simplified Update Checker**: Removed `regenerate_download_url` method and `upgrader_package_options` filter hook
+- **Streamlined Validation**: License validation now handled entirely by proxy endpoint, reducing redundant checks in WordPress plugin
+- **Code Cleanup**: Removed unused imports and functions related to signed URLs
+
+## [0.4.0] - 2024
+
+### Added
+
+#### Features
+
+- **Licensing System**: Complete license management system integrated with Lemon Squeezy for payments and Supabase for license tracking.
+
+  - **License Activation**: Activate licenses directly from the plugin settings page
+  - **License Status Display**: View license status, purchase date, billing cycle, next payment date, and expiry date
+  - **Grace Period**: 7-day grace period after license expiry where plugin remains functional with warnings
+  - **License Validation**: Automatic daily validation via WordPress cron, plus on-demand validation
+  - **Update Integration**: Plugin updates delivered via S3 with signed URLs, integrated with WordPress native update system
+  - **Activation Tracking**: All license activations tracked in database (site URL, IP address, timestamp) for abuse monitoring
+
+- **Access Control**: Plugin features gated based on license status.
+
+  - **Settings Page**: Settings sections (Icon Set, Palette, Migration) hidden when license is invalid/expired
+  - **Icon Picker**: Icon selection blocked when license is invalid/expired, with clear messaging
+  - **Existing Icons**: Existing icons continue to display regardless of license status (prevents site breakage)
+  - **License Section**: Always visible so users can activate/reactivate licenses
+
+- **Update System**: Secure plugin update delivery with license validation.
+
+  - **Update Visibility**: Updates shown to all users, regardless of license status
+  - **Download Protection**: Updates only downloadable with valid license (active or grace period)
+  - **Unauthorized Error**: Clear error messages when attempting to download updates without valid license
+  - **Proxy Endpoint**: Updates delivered via proxy endpoint that validates licenses before streaming (replaced signed URLs in 0.6.0)
+  - **Changelog Support**: Changelog fetching from marketing site API (fallback message for now)
+
+#### UX Improvements
+
+- **License UI**: Clean, consistent license management interface matching shadcn UI design patterns
+- **License Notices**: Improved notice styling in ACF fields with links to settings page
+- **Toast Consistency**: Unified toast and alert styling across the plugin
+- **Error Messages**: Clear, actionable error messages for license-related issues
+
+### Fixed
+
+- **Update URL Expiry**: Fixed update delivery issues by implementing proxy endpoint approach (replaced signed URLs in 0.6.0)
+- **Update Visibility**: Fixed updates being hidden when license is invalid - now shows update but blocks download
+- **License Notice Styling**: Fixed inconsistent styling between settings page alerts and ACF field notices
+- **Console Clutter**: Removed all debug console.log statements for cleaner browser console
+
+### Changed
+
+- **License Server URL**: Updated default licensing server URL to Vercel deployment
+- **Update Check Flow**: Removed redundant toast notifications - updates now appear in WordPress Plugins page like other plugins
+- **Changelog Message**: Updated fallback changelog message to indicate it will be included in next release
+
+### Technical Improvements
+
+- **REST API Endpoints**: Added `/license`, `/license/activate`, `/license/deactivate`, `/license/check-update`, and `/api/download` endpoints
+- **Update Checker**: Integrated with WordPress update system via `pre_set_site_transient_update_plugins` filter
+- **Download Protection**: Added `upgrader_pre_download` filter to block unauthorized downloads with custom error messages (simplified in 0.6.0)
+- **Proxy Endpoint**: Added `/api/download` endpoint for secure file delivery with license validation (replaced signed URLs in 0.6.0)
+- **Activation Tracking**: Automatic tracking of all license activations for abuse monitoring
+- **Code Quality**: Removed all debug logging, improved error handling
+
+---
+
 ## [0.3.0] - 2024
 
 ### Added

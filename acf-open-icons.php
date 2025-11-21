@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Advanced Custom Fields: Open Icons
  * Description: ACF field that lets you use popular open-source icon sets (Lucide, Tabler, Heroicons, etc.) with caching, sanitisation, and stable rendering.
- * Version: 0.3.0
+ * Version: 1.0.0
  * Author: David O'Sullivan
  * Author URI: https://osull.io
  * License: Proprietary
@@ -37,6 +37,7 @@ require_once ACFOI_PLUGIN_DIR . 'includes/helpers.php';
 add_action('plugins_loaded', function () {
   load_plugin_textdomain('acf-open-icons', false, dirname(plugin_basename(__FILE__)) . '/languages');
 
+  $licence   = new ACFOI\Licence();
   $providers = new ACFOI\Providers();
   $sanitiser = new ACFOI\Sanitiser();
   $cache     = new ACFOI\Cache($providers, $sanitiser);
@@ -45,10 +46,11 @@ add_action('plugins_loaded', function () {
   // Set migration on rest for migrate endpoint
   $rest->set_migration($migration);
   $settings  = new ACFOI\Settings($providers, $cache, $migration);
+  $update_checker = new ACFOI\Update_Checker();
 
-  add_action('acf/init', function () use ($providers, $cache, $sanitiser) {
+  add_action('acf/init', function () use ($providers, $cache, $sanitiser, $licence) {
     if (function_exists('acf_register_field_type')) {
-      acf_register_field_type(new ACFOI\ACF_Field_Open_Icons($providers, $cache, $sanitiser));
+      acf_register_field_type(new ACFOI\ACF_Field_Open_Icons($providers, $cache, $sanitiser, $licence));
     }
   });
 });

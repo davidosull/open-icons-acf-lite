@@ -40,8 +40,6 @@ class Rest {
       }
     }
 
-    error_log('ACF Open Icons Migration: REST authentication filter - route: ' . ($route ?: 'unknown') . ', result: ' . ($result ? 'error' : 'null'));
-
     // Only handle our migration endpoints
     if ($route && strpos($route, $this->ns . '/migration/') === 0) {
       // In REST API context, WordPress doesn't automatically load user from cookies
@@ -53,21 +51,13 @@ class Rest {
 
       if ($cookie) {
         $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
-        error_log('ACF Open Icons Migration: REST authentication - cookie validation user ID: ' . ($user_id ?: '0'));
 
         if ($user_id) {
           wp_set_current_user($user_id);
           if (current_user_can('manage_options')) {
-            error_log('ACF Open Icons Migration: REST authentication - allowing access via cookie auth for route: ' . $route);
             return null; // null means authentication passed
-          } else {
-            error_log('ACF Open Icons Migration: REST authentication - user ' . $user_id . ' does not have manage_options');
           }
-        } else {
-          error_log('ACF Open Icons Migration: REST authentication - cookie validation failed');
         }
-      } else {
-        error_log('ACF Open Icons Migration: REST authentication - no logged_in cookie found');
       }
     }
 
@@ -109,27 +99,19 @@ class Rest {
       'methods'  => 'GET',
       'callback' => [$this, 'get_migration_status'],
       'permission_callback' => function (\WP_REST_Request $request) {
-        error_log('ACF Open Icons Migration: REST permission check - user can manage_options: ' . (current_user_can('manage_options') ? 'yes' : 'no'));
-        error_log('ACF Open Icons Migration: REST permission check - user ID: ' . get_current_user_id());
-        error_log('ACF Open Icons Migration: REST permission check - is_user_logged_in: ' . (is_user_logged_in() ? 'yes' : 'no'));
-        error_log('ACF Open Icons Migration: REST permission check - nonce header: ' . ($request->get_header('X-WP-Nonce') ? 'present' : 'missing'));
-
         // WordPress REST API uses cookie authentication for logged-in users
         // For GET requests, cookie authentication is sufficient
         // Nonce is optional for GET requests when user is authenticated via cookies
         if (! is_user_logged_in()) {
-          error_log('ACF Open Icons Migration: REST permission check - user not logged in');
           return false;
         }
 
         if (! current_user_can('manage_options')) {
-          error_log('ACF Open Icons Migration: REST permission check - user cannot manage_options');
           return false;
         }
 
         // For GET requests, cookie authentication is sufficient
         // Nonce verification is optional (WordPress REST API handles this automatically)
-        error_log('ACF Open Icons Migration: REST permission check - access granted');
         return true;
       },
     ]);
@@ -137,6 +119,39 @@ class Rest {
     register_rest_route($this->ns, '/migration/migrate-icon', [
       'methods'  => 'POST',
       'callback' => [$this, 'migrate_icon'],
+      'permission_callback' => function () {
+        return current_user_can('manage_options');
+      },
+    ]);
+
+    // License endpoints
+    register_rest_route($this->ns, '/license', [
+      'methods'  => 'GET',
+      'callback' => [$this, 'get_license'],
+      'permission_callback' => function () {
+        return current_user_can('manage_options');
+      },
+    ]);
+
+    register_rest_route($this->ns, '/license/activate', [
+      'methods'  => 'POST',
+      'callback' => [$this, 'activate_license'],
+      'permission_callback' => function () {
+        return current_user_can('manage_options');
+      },
+    ]);
+
+    register_rest_route($this->ns, '/license/deactivate', [
+      'methods'  => 'POST',
+      'callback' => [$this, 'deactivate_license'],
+      'permission_callback' => function () {
+        return current_user_can('manage_options');
+      },
+    ]);
+
+    register_rest_route($this->ns, '/license/check-update', [
+      'methods'  => 'GET',
+      'callback' => [$this, 'check_update'],
       'permission_callback' => function () {
         return current_user_can('manage_options');
       },
@@ -303,31 +318,22 @@ class Rest {
    * @return array|\WP_Error Migration status or error
    */
   public function get_migration_status(\WP_REST_Request $req) {
-    error_log('ACF Open Icons Migration: get_migration_status REST endpoint called');
-
     if (! $this->migration) {
-      error_log('ACF Open Icons Migration: Migration service not available');
       return new \WP_Error('acfoi_not_available', __('Migration service not available.', 'acf-open-icons'), ['status' => 500]);
     }
 
     // Get provider from request parameter (for preview) or from settings
     $provider_param = sanitize_key((string) $req->get_param('provider'));
-    error_log('ACF Open Icons Migration: Provider parameter: ' . ($provider_param ?: 'none'));
 
     if (! empty($provider_param) && $this->providers->get($provider_param)) {
       $current_provider = $provider_param;
-      error_log('ACF Open Icons Migration: Using provider from parameter: ' . $current_provider);
     } else {
       $settings = get_option('acf_open_icons_settings', []);
       $current_provider = $settings['activeProvider'] ?? 'lucide';
-      error_log('ACF Open Icons Migration: Using provider from settings: ' . $current_provider);
     }
 
     // Get migration status
-    error_log('ACF Open Icons Migration: Calling get_migration_status with provider: ' . $current_provider);
     $status = $this->migration->get_migration_status($current_provider);
-    error_log('ACF Open Icons Migration: Status returned - total: ' . ($status['total'] ?? 0) . ', non_current: ' . (isset($status['non_current']) ? count($status['non_current']) : 0));
-    error_log('ACF Open Icons Migration: Providers found: ' . (isset($status['by_provider']) ? implode(', ', array_keys($status['by_provider'])) : 'none'));
 
     // Group non-current icons by iconKey for easier frontend handling
     $grouped_by_icon = [];
@@ -338,7 +344,6 @@ class Rest {
       }
       $grouped_by_icon[$icon_key][] = $icon;
     }
-    error_log('ACF Open Icons Migration: Grouped by icon - ' . count($grouped_by_icon) . ' unique icon keys');
 
     $result = [
       'current_provider' => $current_provider,
@@ -347,8 +352,6 @@ class Rest {
       'grouped_by_icon' => $grouped_by_icon,
       'total' => $status['total'],
     ];
-
-    error_log('ACF Open Icons Migration: Returning result - current_provider: ' . $result['current_provider'] . ', non_current count: ' . count($result['non_current']));
 
     return $result;
   }
@@ -419,5 +422,59 @@ class Rest {
       'migrated_count' => $migrated_count,
       'total_count' => count($icons_to_migrate),
     ];
+  }
+
+  /**
+   * Get license status
+   */
+  public function get_license(\WP_REST_Request $req) {
+    $licence = new Licence();
+    $status = $licence->get_status();
+    return $status;
+  }
+
+  /**
+   * Activate license
+   */
+  public function activate_license(\WP_REST_Request $req) {
+    $license_key = sanitize_text_field((string) $req->get_param('license_key'));
+
+    if (empty($license_key)) {
+      return new \WP_Error('acfoi_bad_request', __('License key is required.', 'acf-open-icons'), ['status' => 400]);
+    }
+
+    $licence = new Licence();
+    $result = $licence->activate($license_key);
+
+    if (! $result['success']) {
+      return new \WP_Error('acfoi_activation_failed', $result['message'], ['status' => 400]);
+    }
+
+    // Clear update transient so WordPress immediately picks up any available updates
+    // WordPress will show the update on the Plugins page automatically
+    delete_site_transient('update_plugins');
+
+    return [
+      'success' => true,
+      'message' => $result['message'],
+      'license' => $result['license'] ?? null,
+    ];
+  }
+
+  /**
+   * Deactivate license
+   */
+  public function deactivate_license(\WP_REST_Request $req) {
+    $licence = new Licence();
+    $licence->deactivate();
+    return ['success' => true, 'message' => __('License deactivated successfully.', 'acf-open-icons')];
+  }
+
+  /**
+   * Check for updates
+   */
+  public function check_update(\WP_REST_Request $req) {
+    $update_checker = new Update_Checker();
+    return $update_checker->check_for_updates();
   }
 }

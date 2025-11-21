@@ -121,10 +121,7 @@ class Settings {
    * @param array $new_value New settings value
    */
   public function detect_provider_change($old_value, $new_value): void {
-    error_log('ACF Open Icons Migration: detect_provider_change called');
-
     if (! $this->migration || ! current_user_can('manage_options')) {
-      error_log('ACF Open Icons Migration: Migration not available or insufficient permissions');
       return;
     }
 
@@ -139,18 +136,13 @@ class Settings {
     $new_provider = $new_value['activeProvider'] ?? 'lucide';
     $new_version  = $new_value['pinnedVersion'] ?? 'latest';
 
-    error_log('ACF Open Icons Migration: Provider change detected - old: ' . $old_provider . ', new: ' . $new_provider . ', version: ' . $new_version);
-
     // Only migrate if provider actually changed
     if ($old_provider === $new_provider) {
-      error_log('ACF Open Icons Migration: Provider unchanged, skipping migration');
       return;
     }
 
     // Run migration (no result storage needed - frontend will query status)
-    error_log('ACF Open Icons Migration: Starting migration...');
     $results = $this->migration->migrate_icons($old_provider, $new_provider, $new_version);
-    error_log('ACF Open Icons Migration: Migration complete - matched: ' . ($results['matched_count'] ?? 0) . ', unmatched: ' . (isset($results['unmatched']) ? count($results['unmatched']) : 0) . ', total: ' . ($results['total_found'] ?? 0));
   }
 
   /**
@@ -199,36 +191,47 @@ class Settings {
       $old_hex = $old_palette_map[$token] ?? null;
       if ($old_hex !== null && $old_hex !== $new_hex) {
         $changed_tokens[] = $token;
-        error_log('ACF Open Icons: Color token ' . $token . ' changed from ' . $old_hex . ' to ' . $new_hex);
       }
     }
 
     // Also check for tokens that were removed (though this is less common)
     foreach ($old_palette_map as $token => $old_hex) {
       if (! isset($new_palette_map[$token])) {
-        error_log('ACF Open Icons: Color token ' . $token . ' was removed');
         // We could handle this, but for now we'll skip removed tokens
       }
     }
 
     // Update icons if any tokens changed
     if (! empty($changed_tokens)) {
-      error_log('ACF Open Icons: Updating icons for ' . count($changed_tokens) . ' changed color tokens');
       $results = $this->migration->update_icons_by_color_tokens($changed_tokens);
-      error_log('ACF Open Icons: Updated ' . ($results['updated_count'] ?? 0) . ' icons for changed color tokens');
     }
   }
 
   public function render_page(): void {
+    // Check license status
+    $licence = new Licence();
+    $is_valid = $licence->is_valid();
+    $status = $licence->get_license_status();
+    $license_data = $licence->get_status();
+
     $settings  = $this->get_settings();
     $providers = $this->providers->all();
 ?>
     <div class="wrap">
       <h1><?php echo esc_html__('Open Icons Settings', 'acf-open-icons'); ?></h1>
-      <form method="post" action="options.php" style="margin-bottom:16px;">
+
+      <?php
+      // Always render the form so React UI can mount (it will hide/show sections based on license)
+      // The form is needed for React to find and mount the UI
+      ?>
+      <form method="post" action="options.php" style="margin-bottom:16px; display:none;">
         <?php settings_fields('acf_open-icons'); ?>
         <input type="hidden" name="<?php echo esc_attr($this->option_key); ?>[__nonce]" value="<?php echo esc_attr(wp_create_nonce('acfoi_admin')); ?>" />
-        <table class="form-table" role="presentation">
+        <?php
+        // Always render the table (hidden) so React can read provider options
+        // React UI will show/hide sections based on license status
+        ?>
+        <table class="form-table" role="presentation" style="display:none;">
           <tr>
             <th scope="row"><?php esc_html_e('Icon Set', 'acf-open-icons'); ?></th>
             <td>
@@ -269,12 +272,16 @@ class Settings {
         </table>
         <?php submit_button(); ?>
       </form>
-      <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+      <?php
+      // Always render purge/restore forms (hidden) so React can find them if needed
+      // React will show/hide buttons based on license status
+      ?>
+      <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:none;">
         <?php wp_nonce_field('acfoi_admin'); ?>
         <input type="hidden" name="action" value="acfoi_purge_cache" />
         <?php submit_button(__('Purge Icon Cache', 'acf-open-icons'), 'secondary'); ?>
       </form>
-      <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+      <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:none;">
         <?php wp_nonce_field('acfoi_admin'); ?>
         <input type="hidden" name="action" value="acfoi_restore_defaults" />
         <?php submit_button(__('Restore Defaults', 'acf-open-icons'), 'delete'); ?>

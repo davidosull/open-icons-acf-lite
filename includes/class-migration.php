@@ -54,8 +54,6 @@ class Migration {
       }
     }
 
-    error_log('ACF Open Icons Migration: find_all_icons found ' . count($deduplicated) . ' unique icons (before dedup: ' . count($icons) . ')');
-
     return $deduplicated;
   }
 
@@ -79,10 +77,7 @@ class Migration {
    * @return array Status with icons grouped by provider and unmatched icons
    */
   public function get_migration_status(string $current_provider): array {
-    error_log('ACF Open Icons Migration: get_migration_status called with current_provider: ' . $current_provider);
-
     $all_icons = $this->find_all_icons();
-    error_log('ACF Open Icons Migration: Found ' . count($all_icons) . ' total icons');
 
     // Group icons by provider
     $by_provider = [];
@@ -100,12 +95,8 @@ class Migration {
       // Track icons from non-current providers
       if ($provider !== $current_provider) {
         $non_current[] = $icon;
-        error_log('ACF Open Icons Migration: Found non-current icon - provider: ' . $provider . ', iconKey: ' . $icon_key . ', type: ' . ($icon['type'] ?? 'unknown'));
       }
     }
-
-    error_log('ACF Open Icons Migration: Grouped by provider - ' . count($by_provider) . ' providers: ' . implode(', ', array_keys($by_provider)));
-    error_log('ACF Open Icons Migration: Non-current icons count: ' . count($non_current));
 
     return [
       'by_provider' => $by_provider,
@@ -647,12 +638,9 @@ class Migration {
     }
 
     // Get all icons from old provider
-    error_log('ACF Open Icons Migration: Finding icons from old provider: ' . $old_provider);
     $old_provider_icons = $this->find_icons_by_provider($old_provider);
-    error_log('ACF Open Icons Migration: Found ' . count($old_provider_icons) . ' icons from old provider');
 
     if (empty($old_provider_icons)) {
-      error_log('ACF Open Icons Migration: No icons found from old provider');
       return [
         'matched_count' => 0,
         'unmatched'     => [],
@@ -661,17 +649,14 @@ class Migration {
     }
 
     // Get manifest for new provider
-    error_log('ACF Open Icons Migration: Fetching manifest for new provider: ' . $new_provider);
     $new_manifest = $this->get_provider_manifest($new_provider, $new_version);
     if (empty($new_manifest)) {
-      error_log('ACF Open Icons Migration: Failed to fetch manifest for new provider');
       return [
         'matched_count' => 0,
         'unmatched'     => array_values($old_provider_icons),
         'error'         => __('Failed to fetch manifest for new provider.', 'acf-open-icons'),
       ];
     }
-    error_log('ACF Open Icons Migration: Manifest fetched - ' . count($new_manifest) . ' icons available');
 
     // Convert manifest to array for faster lookup
     $manifest_array = array_flip($new_manifest);
@@ -682,30 +667,23 @@ class Migration {
     foreach ($old_provider_icons as $icon) {
       $icon_key = $icon['value']['iconKey'] ?? '';
       if (empty($icon_key)) {
-        error_log('ACF Open Icons Migration: Icon missing iconKey, adding to unmatched');
         $unmatched[] = $icon;
         continue;
       }
 
       // Check for exact match
       if (isset($manifest_array[$icon_key])) {
-        error_log('ACF Open Icons Migration: Found match for icon: ' . $icon_key);
         // Update icon
         $updated = $this->update_icon_value($icon, $new_provider, $new_version);
         if ($updated) {
           $matched_count++;
-          error_log('ACF Open Icons Migration: Successfully updated icon: ' . $icon_key);
         } else {
-          error_log('ACF Open Icons Migration: Failed to update icon: ' . $icon_key);
           $unmatched[] = $icon;
         }
       } else {
-        error_log('ACF Open Icons Migration: No match found for icon: ' . $icon_key);
         $unmatched[] = $icon;
       }
     }
-
-    error_log('ACF Open Icons Migration: Migration complete - matched: ' . $matched_count . ', unmatched: ' . count($unmatched) . ', total: ' . count($old_provider_icons));
 
     return [
       'matched_count' => $matched_count,
@@ -742,14 +720,12 @@ class Migration {
     // Get the new icon key (may have been changed in manual migration)
     $new_icon_key = $location['value']['iconKey'] ?? '';
     if (empty($new_icon_key)) {
-      error_log('ACF Open Icons Migration: update_icon_value - missing iconKey');
       return false;
     }
 
     // Fetch the new SVG from the new provider (uncolored, from cache)
     $new_svg = $this->cache->get_svg($new_provider, $new_version, $new_icon_key);
     if (empty($new_svg)) {
-      error_log('ACF Open Icons Migration: update_icon_value - failed to fetch SVG for ' . $new_provider . '@' . $new_version . '/' . $new_icon_key);
       return false;
     }
 
@@ -863,8 +839,6 @@ class Migration {
       return ['updated_count' => 0];
     }
 
-    error_log('ACF Open Icons: Updating icons for changed color tokens: ' . implode(', ', $changed_tokens));
-
     // Get current settings to find new color values
     $settings = get_option('acf_open_icons_settings', []);
     $palette = $settings['palette'] ?? [];
@@ -879,7 +853,6 @@ class Migration {
 
     // Find all icons
     $all_icons = $this->find_all_icons();
-    error_log('ACF Open Icons: Found ' . count($all_icons) . ' total icons to check');
 
     $updated_count = 0;
 
@@ -894,7 +867,6 @@ class Migration {
       // Get the new color for this token
       $new_color_hex = $palette_map[$color_token] ?? null;
       if (empty($new_color_hex)) {
-        error_log('ACF Open Icons: No color found for token: ' . $color_token);
         continue;
       }
 
@@ -904,14 +876,12 @@ class Migration {
       $icon_key = $icon['value']['iconKey'] ?? '';
 
       if (empty($provider) || empty($icon_key)) {
-        error_log('ACF Open Icons: Icon missing provider or iconKey, skipping');
         continue;
       }
 
       // Fetch the base SVG (without color) from cache
       $base_svg = $this->cache->get_svg($provider, $version, $icon_key);
       if (empty($base_svg)) {
-        error_log('ACF Open Icons: Failed to fetch SVG for ' . $provider . '@' . $version . '/' . $icon_key);
         continue;
       }
 
@@ -990,13 +960,9 @@ class Migration {
 
       if ($updated) {
         $updated_count++;
-        error_log('ACF Open Icons: Updated icon ' . $icon_key . ' with token ' . $color_token . ' to color ' . $new_color_hex);
-      } else {
-        error_log('ACF Open Icons: Failed to update icon ' . $icon_key . ' with token ' . $color_token);
       }
     }
 
-    error_log('ACF Open Icons: Updated ' . $updated_count . ' icons for changed color tokens');
     return ['updated_count' => $updated_count];
   }
 }
