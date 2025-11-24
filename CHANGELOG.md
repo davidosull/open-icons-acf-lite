@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2025-11-24
+
+### Fixed
+
+- Prevent the admin from entering dev mode just because another Vite server is running locally. The plugin now verifies its own dev entry before loading dev assets and exposes filters/constants for overriding host/port if needed.
+
 ## [1.0.0] - 2024
 
 ### 🎉 Major Release - Production Ready

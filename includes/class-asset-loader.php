@@ -9,30 +9,165 @@ if (! defined('ABSPATH')) {
 class Asset_Loader {
 
   private static $module_script_filters_added = false;
+  private const DEFAULT_DEV_ASSET = '/src/picker.tsx';
+
+  private static function get_dev_server_scheme(): string {
+    $scheme = defined('ACFOI_DEV_SERVER_SCHEME') ? (string) ACFOI_DEV_SERVER_SCHEME : 'http';
+    $scheme = strtolower(trim($scheme));
+    if (! in_array($scheme, ['http', 'https'], true)) {
+      $scheme = 'http';
+    }
+    /**
+     * Filter the protocol used for the dev server URL.
+     *
+     * @param string $scheme
+     */
+    $scheme = (string) apply_filters('acfoi_dev_server_scheme', $scheme);
+    return in_array($scheme, ['http', 'https'], true) ? $scheme : 'http';
+  }
+
+  private static function get_dev_server_host(): string {
+    $host = defined('ACFOI_DEV_SERVER_HOST') ? (string) ACFOI_DEV_SERVER_HOST : '127.0.0.1';
+    $host = trim($host);
+    if ($host === '') {
+      $host = '127.0.0.1';
+    }
+    /**
+     * Filter the host used for the dev server URL.
+     *
+     * @param string $host
+     */
+    $host = (string) apply_filters('acfoi_dev_server_host', $host);
+    return $host !== '' ? $host : '127.0.0.1';
+  }
+
+  private static function get_dev_server_port(): int {
+    $port = defined('ACFOI_DEV_SERVER_PORT') ? (int) ACFOI_DEV_SERVER_PORT : 5173;
+    if ($port <= 0) {
+      $port = 5173;
+    }
+    /**
+     * Filter the port used for the dev server URL.
+     *
+     * @param int $port
+     */
+    $port = (int) apply_filters('acfoi_dev_server_port', $port);
+    return $port > 0 ? $port : 5173;
+  }
+
+  private static function get_dev_asset_path(): string {
+    $asset_path = defined('ACFOI_DEV_ASSET_PATH') ? (string) ACFOI_DEV_ASSET_PATH : self::DEFAULT_DEV_ASSET;
+    $asset_path = '/' . ltrim($asset_path, '/');
+    /**
+     * Filter the asset path used when probing the dev server.
+     *
+     * @param string $asset_path
+     */
+    $asset_path = (string) apply_filters('acfoi_dev_asset_path', $asset_path);
+    return '/' . ltrim($asset_path, '/');
+  }
+
+  private static function build_dev_server_url(): string {
+    $scheme = self::get_dev_server_scheme();
+    $host = self::get_dev_server_host();
+    $port = self::get_dev_server_port();
+
+    $base = sprintf('%s://%s', $scheme, $host);
+    $default_port = $scheme === 'https' ? 443 : 80;
+    if ($port !== $default_port) {
+      $base .= ':' . $port;
+    }
+    return $base;
+  }
+
+  private static function probe_dev_asset(): array {
+    $url = rtrim(self::build_dev_server_url(), '/') . '/' . ltrim(self::get_dev_asset_path(), '/');
+    $result = [
+      'ok' => false,
+      'code' => null,
+      'content_type' => null,
+      'error' => null,
+    ];
+
+    if (! function_exists('wp_remote_get')) {
+      $result['error'] = 'wp_remote_get unavailable';
+      return $result;
+    }
+
+    $response = wp_remote_get($url, [
+      'timeout' => 0.75,
+      'redirection' => 1,
+      'headers' => [
+        'Accept' => 'application/javascript,text/html;q=0.9,*/*;q=0.1',
+      ],
+    ]);
+
+    if (is_wp_error($response)) {
+      $result['error'] = $response->get_error_message();
+      return $result;
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    $content_type = (string) wp_remote_retrieve_header($response, 'content-type');
+    $body = (string) wp_remote_retrieve_body($response);
+
+    $result['code'] = $code;
+    $result['content_type'] = $content_type;
+
+    $is_success_code = in_array($code, [200, 304], true);
+    $content_type = strtolower($content_type);
+    $is_expected_type = strpos($content_type, 'javascript') !== false || strpos($content_type, 'html') !== false;
+    $looks_like_vite = strpos($body, '@vite') !== false || strpos($body, 'import.meta') !== false;
+
+    $result['ok'] = $is_success_code && $is_expected_type && $looks_like_vite;
+    if (! $result['ok'] && empty($body)) {
+      $result['error'] = 'Empty response body';
+    }
+
+    return $result;
+  }
 
   public static function is_dev_mode(): bool {
     // Optional manual override via .dev file (not required for normal switching)
+    $context = [
+      'host' => self::get_dev_server_host(),
+      'port' => self::get_dev_server_port(),
+      'asset' => self::get_dev_asset_path(),
+      'reason' => 'auto_probe',
+      'response_code' => null,
+      'content_type' => null,
+      'error' => null,
+    ];
+
     if (file_exists(ACFOI_PLUGIN_DIR . '.dev')) {
-      return true;
+      $context['reason'] = 'dot_dev_flag';
+      return (bool) apply_filters('acfoi_is_dev_mode', true, $context);
     }
 
-    // Auto-switch: detect if Vite dev server port is open; if yes, use dev mode
-    $host = '127.0.0.1';
-    $port = 5173;
+    // Auto-switch: detect if Vite dev server port is open; if yes, verify asset
+    $host = $context['host'];
+    $port = $context['port'];
     $timeoutSeconds = 0.25; // quick non-blocking check
     $errno = 0;
     $errstr = '';
     $conn = @fsockopen($host, $port, $errno, $errstr, $timeoutSeconds);
     if (is_resource($conn)) {
       fclose($conn);
-      return true;
+      $probe = self::probe_dev_asset();
+      $context['response_code'] = $probe['code'];
+      $context['content_type'] = $probe['content_type'];
+      $context['error'] = $probe['error'];
+      $context['reason'] = $probe['ok'] ? 'asset_probe_passed' : 'asset_probe_failed';
+      return (bool) apply_filters('acfoi_is_dev_mode', (bool) $probe['ok'], $context);
     }
+    $context['reason'] = 'port_closed';
+    $context['error'] = $errstr ?: null;
 
-    return false; // default to production assets
+    return (bool) apply_filters('acfoi_is_dev_mode', false, $context); // default to production assets
   }
 
   public static function get_vite_server_url(): string {
-    return 'http://localhost:5173';
+    return self::build_dev_server_url();
   }
 
   /**
