@@ -1,12 +1,28 @@
 # Changelog
 
+## [1.0.2] - 2025-01-XX
+
+### Fixed
+
+- **"Use Last Colour" Context Isolation**: Fixed "Use Last Colour" feature to properly isolate color storage per instance of flexible layouts and repeaters. Previously, all instances of the same layout type shared the same last colour, causing new instances to incorrectly inherit colours from previous instances. Now each layout instance and repeater row has its own isolated storage.
+  - Flexible layout instances now use unique instance identifiers (supports both numeric and alphanumeric IDs used by ACF)
+  - Repeater rows are isolated per row index/ID
+  - New instances start with default colour token until a colour is explicitly selected in that instance
+
+- **Admin Preview Color Updates**: Fixed issue where admin post edit screen showed old colours after palette token values were updated in settings. The preview now regenerates SVG from the current `colorToken` and palette settings, ensuring it always displays the current colour values. The stored SVG in the database is also updated when saving the post.
+
+### Technical Improvements
+
+- **Instance Index Extraction**: Improved context detection to extract flexible layout instance IDs and repeater row IDs from ACF input name paths, supporting both numeric and alphanumeric identifier formats
+- **Debug Logging**: Added comprehensive debug logging system (enabled via `window.__ACFOI_DEBUG__ = true`) for troubleshooting context extraction and storage key generation
+
 ## [1.0.1] - 2025-11-24
 
 ### Fixed
 
 - Prevent the admin from entering dev mode just because another Vite server is running locally. The plugin now verifies its own dev entry before loading dev assets and exposes filters/constants for overriding host/port if needed.
 
-## [1.0.0] - 2024
+## [1.0.0] - 2025-11-21
 
 ### 🎉 Major Release - Production Ready
 
@@ -68,7 +84,7 @@ This release maintains full backward compatibility with version 0.6.0. No databa
 
 ---
 
-## [0.6.0] - 2024
+## [0.6.0] - 2025-11-12
 
 ### Changed
 
@@ -85,7 +101,7 @@ This release maintains full backward compatibility with version 0.6.0. No databa
 - **Streamlined Validation**: License validation now handled entirely by proxy endpoint, reducing redundant checks in WordPress plugin
 - **Code Cleanup**: Removed unused imports and functions related to signed URLs
 
-## [0.4.0] - 2024
+## [0.4.0] - 2025-11-08
 
 ### Added
 
@@ -146,7 +162,7 @@ This release maintains full backward compatibility with version 0.6.0. No databa
 
 ---
 
-## [0.3.0] - 2024
+## [0.3.0] - 2025-11-06
 
 ### Added
 
@@ -214,7 +230,7 @@ This release maintains full backward compatibility with version 0.6.0. No databa
 
 ---
 
-## [0.2.0] - 2024
+## [0.2.0] - 2025-11-02
 
 ### Added
 
@@ -290,6 +306,6 @@ This release maintains full backward compatibility with version 0.6.0. No databa
 
 ---
 
-## [0.1.0] - Initial Release
+## [0.1.0] - Initial Release 25-10-24
 
 Initial release of ACF Open Icons plugin.

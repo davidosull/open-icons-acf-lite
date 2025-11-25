@@ -57,6 +57,50 @@ class ACF_Field_Open_Icons extends \acf_field {
     $pickerVer  = esc_attr($settings['pinnedVersion']); // Always use current for picker
     $refProv = esc_attr((!empty($refKey) && isset($value['provider'])) ? $value['provider'] : $settings['activeProvider']);
     $refVer  = esc_attr((!empty($refKey) && isset($value['version'])) ? $value['version'] : $settings['pinnedVersion']);
+
+    // If we have a colorToken, regenerate the SVG with current palette color
+    // This ensures the preview shows the current color even if the stored SVG has old color
+    $color_token = $value['colorToken'] ?? null;
+    if (!empty($color_token) && !empty($refKey) && !empty($stored)) {
+      $palette = $settings['palette'] ?? [];
+      $color_hex = null;
+
+      // Find the current color for this token
+      if (is_array($palette)) {
+        foreach ($palette as $item) {
+          if (isset($item['token']) && $item['token'] === $color_token) {
+            $color_hex = $item['hex'] ?? null;
+            break;
+          }
+        }
+      }
+
+      // If we found a color and it's different from what's in the stored SVG, regenerate
+      if (!empty($color_hex)) {
+        // Get base SVG from cache (without color)
+        $base_svg = $this->cache->get_svg($refProv, $refVer, $refKey);
+        if (!empty($base_svg)) {
+          // Apply current color to base SVG
+          $has_stroke = preg_match('/\bstroke(?!-)\s*=/i', $base_svg);
+          $has_fill = preg_match('/\bfill(?!-)\s*=/i', $base_svg) && !preg_match('/fill\s*=\s*["\']none["\']/i', $base_svg);
+
+          $new_svg = $base_svg;
+
+          // Apply color to stroke if present
+          if ($has_stroke) {
+            $new_svg = preg_replace('/\bstroke(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'stroke="' . esc_attr($color_hex) . '"', $new_svg);
+          }
+
+          // Apply color to fill if present and not explicitly set to "none"
+          if ($has_fill) {
+            $new_svg = preg_replace('/\bfill(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'fill="' . esc_attr($color_hex) . '"', $new_svg);
+          }
+
+          // Use the regenerated SVG for preview
+          $stored = $new_svg;
+        }
+      }
+    }
     $field_name = esc_attr($field['name']);
     $instance_id = uniqid('acfoi_', false);
     $has_icon = !empty($refKey) && !empty($stored);
@@ -123,6 +167,10 @@ class ACF_Field_Open_Icons extends \acf_field {
       <input type="hidden" name="<?php echo $field_name; ?>[iconKey]" value="<?php echo $refKey; ?>" data-acfoi-key-out />
       <input type="hidden" name="<?php echo $field_name; ?>[colorToken]" value="<?php echo esc_attr($value['colorToken'] ?? ''); ?>" data-acfoi-color-token-out />
       <textarea class="acf-hidden" name="<?php echo $field_name; ?>[svg]" data-acfoi-svg-out><?php echo esc_textarea($stored); ?></textarea>
+      <?php
+      // Note: $stored may have been regenerated above with current palette color
+      // This ensures both the preview and the textarea show/save the current color
+      ?>
 
       <?php if ($show_grace_warning): ?>
         <div class="notice notice-warning inline" style="margin: 0 0 10px 0;">

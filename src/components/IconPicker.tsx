@@ -82,17 +82,31 @@ function IconSkeleton() {
 function getFieldContext(instanceId: string): {
   fieldGroupKey: string;
   flexibleLayout: string | null;
+  flexibleLayoutInstanceIndex: string | number | null; // Can be numeric or alphanumeric ID
+  flexibleContentFieldKey: string | null;
   repeaterKey: string | null;
+  repeaterRowIndex: string | number | null; // Can be numeric or alphanumeric ID
 } {
   const field = document.querySelector(
     `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
   ) as HTMLElement | null;
   if (!field) {
-    return { fieldGroupKey: '', flexibleLayout: null, repeaterKey: null };
+    return {
+      fieldGroupKey: '',
+      flexibleLayout: null,
+      flexibleLayoutInstanceIndex: null,
+      flexibleContentFieldKey: null,
+      repeaterKey: null,
+      repeaterRowIndex: null,
+    };
   }
 
   // Get field group key from data attribute (set by PHP)
   let fieldGroupKey = field.dataset.acfoiFieldGroupKey || '';
+
+  // Get the input element to parse the name path
+  const keyInput = field.querySelector('[data-acfoi-key-out]') as HTMLInputElement | null;
+  const inputName = keyInput?.name || '';
 
   // If not set, try to detect from DOM structure
   // ACF may add field group info to the form or field wrapper
@@ -108,15 +122,12 @@ function getFieldContext(instanceId: string): {
     }
 
     // Fallback: use a hash of the field's name path as a unique identifier
-    if (!fieldGroupKey) {
-      const keyInput = field.querySelector('[data-acfoi-key-out]') as HTMLInputElement | null;
-      if (keyInput) {
-        // Extract field group from input name path (e.g., "acf[field_123][field_456]")
-        const nameMatch = keyInput.name.match(/acf\[([^\]]+)\]/);
-        if (nameMatch && nameMatch[1]) {
-          // Use first part of path as field group identifier
-          fieldGroupKey = nameMatch[1].split('][')[0] || '';
-        }
+    if (!fieldGroupKey && inputName) {
+      // Extract field group from input name path (e.g., "acf[field_123][field_456]")
+      const nameMatch = inputName.match(/acf\[([^\]]+)\]/);
+      if (nameMatch && nameMatch[1]) {
+        // Use first part of path as field group identifier
+        fieldGroupKey = nameMatch[1].split('][')[0] || '';
       }
     }
   }
@@ -124,78 +135,313 @@ function getFieldContext(instanceId: string): {
   // Detect flexible content layout
   // ACF adds data-layout attribute to flexible content layouts
   let flexibleLayout: string | null = null;
+  let flexibleLayoutInstanceIndex: number | null = null;
+  let flexibleContentFieldKey: string | null = null;
   const flexibleLayoutEl = field.closest('[data-layout]') as HTMLElement | null;
   if (flexibleLayoutEl) {
     flexibleLayout = flexibleLayoutEl.dataset.layout || null;
+
+    // Extract flexible content field key and instance identifier
+    // ACF structure: acf[flexible_field_key][instance_id][layout_name][...]
+    // Note: The instance ID parsing from input name is unreliable due to nested field structures
+    // We'll use DOM-based identification as the primary method
+    if (flexibleLayoutEl && flexibleLayout) {
+      // Method 1: Try to get instance index from DOM position
+      // Find the flexible content parent and count layout instances
+      const flexibleContentEl = flexibleLayoutEl.closest('[data-type="flexible_content"]') as HTMLElement | null;
+      if (flexibleContentEl) {
+        // Get all layout instances of this type within the flexible content field
+        const allLayouts = flexibleContentEl.querySelectorAll(`[data-layout="${flexibleLayout}"]`);
+        // Find the index of this specific layout instance
+        let instanceIndex = -1;
+        for (let i = 0; i < allLayouts.length; i++) {
+          if (allLayouts[i].contains(field) || allLayouts[i] === flexibleLayoutEl || flexibleLayoutEl.contains(allLayouts[i])) {
+            instanceIndex = i;
+            break;
+          }
+        }
+        if (instanceIndex >= 0) {
+          flexibleLayoutInstanceIndex = instanceIndex;
+        }
+      }
+
+      // Method 2: Try data attributes (fallback)
+      if (flexibleLayoutInstanceIndex === null) {
+        const layoutInstanceId = flexibleLayoutEl?.dataset?.id ||
+                                 flexibleLayoutEl?.getAttribute('data-id') ||
+                                 flexibleLayoutEl?.closest('[data-id]')?.getAttribute('data-id');
+
+        if (layoutInstanceId) {
+          const numericIndex = parseInt(layoutInstanceId, 10);
+          flexibleLayoutInstanceIndex = !isNaN(numericIndex) && layoutInstanceId === numericIndex.toString()
+            ? numericIndex
+            : layoutInstanceId;
+        }
+      }
+
+      // Method 3: Try parsing from input name (last resort)
+      if (flexibleLayoutInstanceIndex === null && inputName) {
+        // Try to find layout name in the path and extract instance ID before it
+        // Pattern: ...][instance_id][layout_name][...]
+        const escapedLayout = flexibleLayout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const layoutMatch = inputName.match(new RegExp(`\\[([^\\]]+)\\]\\[${escapedLayout}\\]`));
+        if (layoutMatch) {
+          const instanceIdStr = layoutMatch[1];
+          // Only use if it doesn't look like a field key
+          if (!instanceIdStr.startsWith('field_')) {
+            const numericIndex = parseInt(instanceIdStr, 10);
+            flexibleLayoutInstanceIndex = !isNaN(numericIndex) && instanceIdStr === numericIndex.toString()
+              ? numericIndex
+              : instanceIdStr;
+          }
+        }
+      }
+
+      // Debug logging
+      if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
+        console.log('[ACFOI] Flexible extraction:', {
+          inputName,
+          flexibleLayout,
+          flexibleLayoutInstanceIndex,
+          flexibleContentFieldKey,
+          allLayoutsCount: flexibleContentEl ? flexibleContentEl.querySelectorAll(`[data-layout="${flexibleLayout}"]`).length : 0,
+        });
+      }
+    }
+
+    // Fallback: try to get flexible content field key from DOM
+    if (!flexibleContentFieldKey) {
+      const flexibleContentEl = flexibleLayoutEl.closest('[data-type="flexible_content"]') as HTMLElement | null;
+      if (flexibleContentEl) {
+        flexibleContentFieldKey = flexibleContentEl.dataset.key || flexibleContentEl.dataset.name || null;
+      }
+    }
   }
 
   // Detect repeater field
   // ACF adds data-type="repeater" to repeater fields
   let repeaterKey: string | null = null;
+  let repeaterRowIndex: number | null = null;
   const repeaterEl = field.closest('[data-type="repeater"]') as HTMLElement | null;
   if (repeaterEl) {
     // Try to get the repeater field key from data-key or data-name
     repeaterKey = repeaterEl.dataset.key || repeaterEl.dataset.name || null;
 
-    // Fallback: extract from input name if data attributes not available
-    if (!repeaterKey) {
-      const keyInput = field.querySelector('[data-acfoi-key-out]') as HTMLInputElement | null;
-      if (keyInput) {
-        // Extract repeater field from name path (e.g., "acf[field_123][0][field_456]")
-        const nameMatch = keyInput.name.match(/\[(\d+)\]\[([^\]]+)\]/);
-        if (nameMatch && nameMatch[2]) {
-          repeaterKey = nameMatch[2];
+    // Extract repeater row index from input name
+    // Pattern for repeater: acf[field_group][repeater_key][row_index][field_key]
+    // Pattern for repeater in flexible: acf[field_group][flexible_key][flex_index][layout][repeater_key][row_index][field_key]
+    if (inputName) {
+      if (flexibleLayout && flexibleLayoutInstanceIndex !== null) {
+        // Repeater inside flexible content
+        // Pattern: ...][layout_name][repeater_key][row_id][field_key]
+        // We know the layout name, so we can match after it
+        // Escape the layout name for regex
+        const escapedLayout = flexibleLayout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Row ID can be alphanumeric (like instance IDs)
+        const layoutPattern = `\\]\\[${escapedLayout}\\]\\[([^\\]]+)\\]\\[([^\\]]+)\\]\\[([^\\]]+)\\]$`;
+        const nestedRepeaterMatch = inputName.match(new RegExp(layoutPattern));
+        if (nestedRepeaterMatch) {
+          const potentialRepeaterKey = nestedRepeaterMatch[1];
+          const rowIdStr = nestedRepeaterMatch[2];
+          // Try to parse as number if numeric, otherwise keep as string
+          const numericRowIndex = parseInt(rowIdStr, 10);
+          const potentialRowIndex = !isNaN(numericRowIndex) && rowIdStr === numericRowIndex.toString()
+            ? numericRowIndex
+            : rowIdStr;
+          // Verify by checking if we found a repeater element
+          if (repeaterKey && potentialRepeaterKey === repeaterKey) {
+            repeaterRowIndex = potentialRowIndex;
+          } else if (!repeaterKey) {
+            // Use the extracted key if we don't have one from DOM
+            repeaterKey = potentialRepeaterKey;
+            repeaterRowIndex = potentialRowIndex;
+          }
+        }
+      } else {
+        // Top-level repeater (not inside flexible content)
+        // Pattern: acf[field_group][repeater_key][row_id][field_key]
+        // Row ID can be alphanumeric
+        const repeaterMatch = inputName.match(/acf\[[^\]]+\]\[([^\]]+)\]\[([^\]]+)\]\[([^\]]+)\]/);
+        if (repeaterMatch) {
+          const extractedRepeaterKey = repeaterMatch[1];
+          const rowIdStr = repeaterMatch[2];
+          // Try to parse as number if numeric, otherwise keep as string
+          const numericRowIndex = parseInt(rowIdStr, 10);
+          const extractedRowIndex = !isNaN(numericRowIndex) && rowIdStr === numericRowIndex.toString()
+            ? numericRowIndex
+            : rowIdStr;
+          // Verify this is actually a repeater (not a flexible content pattern)
+          // If we have a repeater element, use its key; otherwise use extracted
+          if (repeaterKey && extractedRepeaterKey === repeaterKey) {
+            repeaterRowIndex = extractedRowIndex;
+          } else if (!repeaterKey) {
+            repeaterKey = extractedRepeaterKey;
+            repeaterRowIndex = extractedRowIndex;
+          }
         }
       }
     }
   }
 
-  return { fieldGroupKey, flexibleLayout, repeaterKey };
+  const context = {
+    fieldGroupKey,
+    flexibleLayout,
+    flexibleLayoutInstanceIndex,
+    flexibleContentFieldKey,
+    repeaterKey,
+    repeaterRowIndex,
+  };
+
+  // Debug logging
+  if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
+    console.log('[ACFOI] getFieldContext:', {
+      instanceId,
+      inputName,
+      inputNameFull: inputName, // Show full name for debugging
+      flexibleLayoutEl: flexibleLayoutEl ? {
+        layout: flexibleLayoutEl.dataset.layout,
+        html: flexibleLayoutEl.outerHTML.substring(0, 200),
+      } : null,
+      context,
+    });
+  }
+
+  return context;
 }
 
 // Generate storage key for last color based on context
 function getLastColorStorageKey(
   fieldGroupKey: string,
+  flexibleContentFieldKey: string | null,
   flexibleLayout: string | null,
-  repeaterKey: string | null
+  flexibleLayoutInstanceIndex: string | number | null,
+  repeaterKey: string | null,
+  repeaterRowIndex: string | number | null
 ): string {
   const parts = ['acfoi_last_color', fieldGroupKey];
-  if (flexibleLayout) {
-    parts.push('flex', flexibleLayout);
+
+  // Include flexible content context if present
+  if (flexibleContentFieldKey && flexibleLayout) {
+    parts.push('flex', flexibleContentFieldKey, flexibleLayout);
+    // Include instance index/ID to isolate each layout instance
+    if (flexibleLayoutInstanceIndex !== null) {
+      parts.push('i', String(flexibleLayoutInstanceIndex));
+    }
   }
+
+  // Include repeater context if present
   if (repeaterKey) {
     parts.push('rep', repeaterKey);
+    // Include row index/ID to isolate each repeater row
+    if (repeaterRowIndex !== null) {
+      parts.push('r', String(repeaterRowIndex));
+    }
   }
-  return parts.join('_');
+
+  const key = parts.join('_');
+
+  // Debug logging
+  if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
+    console.log('[ACFOI] getLastColorStorageKey:', {
+      fieldGroupKey,
+      flexibleContentFieldKey,
+      flexibleLayout,
+      flexibleLayoutInstanceIndex,
+      repeaterKey,
+      repeaterRowIndex,
+      generatedKey: key,
+    });
+  }
+
+  return key;
 }
 
 // Get last color from localStorage
 function getLastColor(
   fieldGroupKey: string,
+  flexibleContentFieldKey: string | null,
   flexibleLayout: string | null,
-  repeaterKey: string | null
+  flexibleLayoutInstanceIndex: string | number | null,
+  repeaterKey: string | null,
+  repeaterRowIndex: string | number | null
 ): { token: string; hex: string } | null {
   try {
-    const key = getLastColorStorageKey(fieldGroupKey, flexibleLayout, repeaterKey);
+    const key = getLastColorStorageKey(
+      fieldGroupKey,
+      flexibleContentFieldKey,
+      flexibleLayout,
+      flexibleLayoutInstanceIndex,
+      repeaterKey,
+      repeaterRowIndex
+    );
     const stored = localStorage.getItem(key);
-    if (stored) {
-      return JSON.parse(stored);
+
+    // Debug logging
+    if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
+      console.log('[ACFOI] getLastColor:', {
+        lookupKey: key,
+        found: !!stored,
+        storedValue: stored ? JSON.parse(stored) : null,
+      });
     }
-  } catch {}
+
+    if (stored) {
+      const storedColor = JSON.parse(stored);
+      // Always resolve hex from current palette to ensure we use current color values
+      // The stored hex might be outdated if palette colors changed
+      const palette: { token: string; hex: string }[] = (window as any).__ACFOI_PALETTE__?.items || [];
+      const currentPaletteItem = palette.find((p) => p.token === storedColor.token);
+      if (currentPaletteItem) {
+        return {
+          token: storedColor.token,
+          hex: currentPaletteItem.hex, // Use current palette color, not stored hex
+        };
+      }
+      // Fallback to stored hex if token not found in current palette
+      return storedColor;
+    }
+  } catch (e) {
+    if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
+      console.error('[ACFOI] getLastColor error:', e);
+    }
+  }
   return null;
 }
 
 // Save last color to localStorage
 function saveLastColor(
   fieldGroupKey: string,
+  flexibleContentFieldKey: string | null,
   flexibleLayout: string | null,
+  flexibleLayoutInstanceIndex: string | number | null,
   repeaterKey: string | null,
+  repeaterRowIndex: string | number | null,
   color: { token: string; hex: string }
 ): void {
   try {
-    const key = getLastColorStorageKey(fieldGroupKey, flexibleLayout, repeaterKey);
+    const key = getLastColorStorageKey(
+      fieldGroupKey,
+      flexibleContentFieldKey,
+      flexibleLayout,
+      flexibleLayoutInstanceIndex,
+      repeaterKey,
+      repeaterRowIndex
+    );
+
+    // Debug logging
+    if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
+      console.log('[ACFOI] saveLastColor:', {
+        storageKey: key,
+        color,
+      });
+    }
+
     localStorage.setItem(key, JSON.stringify(color));
-  } catch {}
+  } catch (e) {
+    if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
+      console.error('[ACFOI] saveLastColor error:', e);
+    }
+  }
 }
 
 /**
@@ -321,8 +567,11 @@ export default function IconPicker({
       const context = getFieldContext(instanceId);
       const lastColor = getLastColor(
         context.fieldGroupKey || fieldGroupKey,
+        context.flexibleContentFieldKey,
         context.flexibleLayout,
-        context.repeaterKey
+        context.flexibleLayoutInstanceIndex,
+        context.repeaterKey,
+        context.repeaterRowIndex
       );
       if (lastColor) {
         return { color: lastColor.hex, token: lastColor.token };
@@ -416,8 +665,11 @@ export default function IconPicker({
           const context = getFieldContext(instanceId);
           const lastColor = getLastColor(
             context.fieldGroupKey || fieldGroupKey,
+            context.flexibleContentFieldKey,
             context.flexibleLayout,
-            context.repeaterKey
+            context.flexibleLayoutInstanceIndex,
+            context.repeaterKey,
+            context.repeaterRowIndex
           );
           if (lastColor) {
             setCurrentToken(lastColor.token);
@@ -886,8 +1138,11 @@ export default function IconPicker({
       const context = getFieldContext(instanceId);
       saveLastColor(
         context.fieldGroupKey || fieldGroupKey,
+        context.flexibleContentFieldKey,
         context.flexibleLayout,
+        context.flexibleLayoutInstanceIndex,
         context.repeaterKey,
+        context.repeaterRowIndex,
         color
       );
     }
@@ -905,8 +1160,11 @@ export default function IconPicker({
       const context = getFieldContext(instanceId);
       saveLastColor(
         context.fieldGroupKey || fieldGroupKey,
+        context.flexibleContentFieldKey,
         context.flexibleLayout,
+        context.flexibleLayoutInstanceIndex,
         context.repeaterKey,
+        context.repeaterRowIndex,
         color
       );
     }
@@ -944,8 +1202,11 @@ export default function IconPicker({
               const context = getFieldContext(instanceId);
               const lastColor = getLastColor(
                 context.fieldGroupKey || fieldGroupKey,
+                context.flexibleContentFieldKey,
                 context.flexibleLayout,
-                context.repeaterKey
+                context.flexibleLayoutInstanceIndex,
+                context.repeaterKey,
+                context.repeaterRowIndex
               );
               if (lastColor) {
                 setCurrentToken(lastColor.token);
