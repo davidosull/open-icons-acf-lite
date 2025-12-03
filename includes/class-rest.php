@@ -161,11 +161,13 @@ class Rest {
   public function get_icon(\WP_REST_Request $req) {
     $provider = sanitize_key((string) $req->get_param('provider'));
     $version  = sanitize_text_field((string) $req->get_param('version'));
-    $key      = sanitize_title_with_dashes((string) $req->get_param('key'));
+    // Use custom sanitization that preserves icon names better
+    $key      = $this->sanitize_icon_key((string) $req->get_param('key'));
 
     if (! $this->providers->get($provider) || empty($key)) {
       return new \WP_Error('acfoi_bad_request', __('Invalid provider or key.', 'acf-open-icons'), ['status' => 400]);
     }
+
     $svg = $this->cache->get_svg($provider, $version ?: 'latest', $key);
     if (! $svg) {
       return new \WP_Error('acfoi_not_found', __('Icon not found.', 'acf-open-icons'), ['status' => 404]);
@@ -176,6 +178,21 @@ class Rest {
     header('Cache-Control: public, max-age=31536000');
     echo $svg;
     exit;
+  }
+
+  /**
+   * Sanitize icon key while preserving the exact structure
+   * Only removes truly dangerous characters, preserves dashes and structure
+   */
+  private function sanitize_icon_key(string $key): string {
+    // Remove null bytes and other dangerous characters
+    $key = str_replace(["\0", "\r", "\n"], '', $key);
+    // Remove path traversal attempts
+    $key = str_replace(['..', '/', '\\'], '', $key);
+    // Trim whitespace
+    $key = trim($key);
+    // Preserve the original case and dashes - icon names are case-sensitive in some providers
+    return $key;
   }
 
   public function get_manifest(\WP_REST_Request $req) {
@@ -230,7 +247,8 @@ class Rest {
         if (isset($data['files']) && is_array($data['files'])) {
           foreach ($data['files'] as $file) {
             if (isset($file['path']) && substr($file['path'], -4) === '.svg') {
-              $icons[] = basename($file['path'], '.svg');
+              $icon_name = basename($file['path'], '.svg');
+              $icons[] = $icon_name;
             }
           }
         }
@@ -262,7 +280,8 @@ class Rest {
     $provider = sanitize_key((string) $req->get_param('provider'));
     $version  = sanitize_text_field((string) $req->get_param('version')) ?: 'latest';
     $keys     = (string) $req->get_param('keys');
-    $keys_arr = array_filter(array_map('sanitize_title_with_dashes', explode(',', $keys)));
+    // Use custom sanitization that preserves icon names
+    $keys_arr = array_filter(array_map([$this, 'sanitize_icon_key'], explode(',', $keys)));
 
     $out = [];
     $cache_hits = 0;

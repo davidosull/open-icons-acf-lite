@@ -692,8 +692,16 @@ export default function IconPicker({
         provider
       )}&version=${encodeURIComponent(version)}&key=${encodeURIComponent(currentIconKey)}`;
       fetch(url)
-        .then((r) => r.text())
+        .then((r) => {
+          if (!r.ok) {
+            return null;
+          }
+          return r.text();
+        })
         .then((svg) => {
+          if (!svg) {
+            return;
+          }
           // Store base SVG (without color) - normalize to currentColor
           const baseSvg = normalizeSvgToBase(svg);
           setCache((prev) => ({ ...prev, [currentIconKey]: baseSvg }));
@@ -775,14 +783,19 @@ export default function IconPicker({
     const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
       provider
     )}&version=${encodeURIComponent(version)}&keys=${keysToEagerLoad.join(',')}`;
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => {
-        const next: Record<string, string> = {};
-        for (const it of data.items || []) next[it.key] = it.svg;
-        setCache((prev) => ({ ...next, ...prev }));
-      })
-      .catch(() => {});
+      fetch(url)
+        .then((r) => {
+          if (!r.ok) {
+            return { items: [] };
+          }
+          return r.json();
+        })
+        .then((data) => {
+          const next: Record<string, string> = {};
+          for (const it of data.items || []) next[it.key] = it.svg;
+          setCache((prev) => ({ ...next, ...prev }));
+        })
+        .catch(() => {});
   }, [open, all, cache, provider, version, restBase]);
 
   // Warm recent icons when modal opens
@@ -794,10 +807,17 @@ export default function IconPicker({
       provider
     )}&version=${encodeURIComponent(version)}&keys=${missing.join(',')}`;
     fetch(url)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) {
+          return { items: [] };
+        }
+        return r.json();
+      })
       .then((data) => {
         const next: Record<string, string> = {};
-        for (const it of data.items || []) next[it.key] = it.svg;
+        for (const it of data.items || []) {
+          next[it.key] = it.svg;
+        }
         setCache((prev) => ({ ...next, ...prev }));
       })
       .catch(() => {});
@@ -813,7 +833,12 @@ export default function IconPicker({
         provider
       )}&version=${encodeURIComponent(version)}&keys=${keys.join(',')}`;
       fetch(url)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) {
+            return { items: [] };
+          }
+          return r.json();
+        })
         .then((data) => {
           const next: Record<string, string> = {};
           for (const it of data.items || []) next[it.key] = it.svg;
@@ -940,7 +965,12 @@ export default function IconPicker({
         provider
       )}&version=${encodeURIComponent(version)}&keys=${chunk.join(',')}`;
       return fetch(url)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) {
+            return { items: [] };
+          }
+          return r.json();
+        })
         .then((data) => {
           const next: Record<string, string> = {};
           for (const it of data.items || []) {
@@ -1001,7 +1031,12 @@ export default function IconPicker({
                     ','
                   )}`;
                   return fetch(url)
-                    .then((r) => r.json())
+                    .then((r) => {
+                      if (!r.ok) {
+                        return { items: [] };
+                      }
+                      return r.json();
+                    })
                     .then((data) => {
                       const next: Record<string, string> = {};
                       for (const it of data.items || []) {
@@ -1009,7 +1044,9 @@ export default function IconPicker({
                       }
                       return next;
                     })
-                    .catch(() => ({}));
+                    .catch(() => {
+                      return {};
+                    });
                 })
               ).then((bgResults) => {
                 const bgMerged: Record<string, string> = {};
