@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Advanced Custom Fields: Open Icons
  * Description: ACF field that lets you use popular open-source icon sets (Lucide, Tabler, Heroicons, etc.) with caching, sanitisation, and stable rendering.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: David O'Sullivan
  * Author URI: https://osull.io
  * License: Proprietary

@@ -1,12 +1,17 @@
 # Changelog
 
-## [1.0.2] - 2025-01-XX
+## [1.0.3] - 2025-12-03
 
 ### Fixed
 
 - **Tabler Icons Path Structure**: Fixed issue where some Tabler Icons (including rosette-discount variants) were not loading. Tabler Icons now organizes icons in `outline/` and `filled/` subdirectories instead of directly in the `icons/` directory. The plugin now correctly fetches icons from `icons/outline/{key}.svg` (default) and falls back to `icons/filled/{key}.svg` if needed. This ensures all Tabler Icons variants load correctly.
 
+## [1.0.2] - 2025-01-XX
+
+### Fixed
+
 - **"Use Last Colour" Context Isolation**: Fixed "Use Last Colour" feature to properly isolate color storage per instance of flexible layouts and repeaters. Previously, all instances of the same layout type shared the same last colour, causing new instances to incorrectly inherit colours from previous instances. Now each layout instance and repeater row has its own isolated storage.
+
   - Flexible layout instances now use unique instance identifiers (supports both numeric and alphanumeric IDs used by ACF)
   - Repeater rows are isolated per row index/ID
   - New instances start with default colour token until a colour is explicitly selected in that instance
