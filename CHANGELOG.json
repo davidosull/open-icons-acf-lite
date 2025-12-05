@@ -1,0 +1,77 @@
+{
+  "entries": [
+    {
+      "version": "1.0.3",
+      "date": "2025-12-03",
+      "sections": {
+        "Fixed": [
+          "**Tabler Icons Path Structure**: Fixed issue where some Tabler Icons (including rosette-discount variants) were not loading. Tabler Icons now organizes icons in `outline/` and `filled/` subdirectories instead of directly in the `icons/` directory. The plugin now correctly fetches icons from `icons/outline/{key}.svg` (default) and falls back to `icons/filled/{key}.svg` if needed. This ensures all Tabler Icons variants load correctly."
+        ]
+      }
+    },
+    {
+      "version": "1.0.2",
+      "date": "2025-01-XX",
+      "sections": {
+        "Fixed": [
+          "**\"Use Last Color\" Context Isolation**: Fixed \"Use Last Color\" feature to properly isolate color storage per instance of flexible layouts and repeaters. Previously, all instances of the same layout type shared the same last color, causing new instances to incorrectly inherit colors from previous instances. Now each layout instance and repeater row has its own isolated storage.\n  - Flexible layout instances now use unique instance identifiers (supports both numeric and alphanumeric IDs used by ACF)\n  - Repeater rows are isolated per row index/ID\n  - New instances start with default color token until a color is explicitly selected in that instance",
+          "**Admin Preview Color Updates**: Fixed issue where admin post edit screen showed old colors after palette token values were updated in settings. The preview now regenerates SVG from the current `colorToken` and palette settings, ensuring it always displays the current color values. The stored SVG in the database is also updated when saving the post."
+        ],
+        "Technical Improvements": [
+          "**Instance Index Extraction**: Improved context detection to extract flexible layout instance IDs and repeater row IDs from ACF input name paths, supporting both numeric and alphanumeric identifier formats",
+          "**Debug Logging**: Added comprehensive debug logging system (enabled via `window.__ACFOI_DEBUG__ = true`) for troubleshooting context extraction and storage key generation"
+        ]
+      }
+    },
+    {
+      "version": "1.0.1",
+      "date": "2025-11-24",
+      "sections": {
+        "Fixed": [
+          "Prevent the admin from entering dev mode just because another Vite server is running locally. The plugin now verifies its own dev entry before loading dev assets and exposes filters/constants for overriding host/port if needed."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2025-11-21",
+      "sections": {
+        "Description": [
+          "🎉 Major Release - Production Ready\n\nThis is the first stable production release of ACF Open Icons. The plugin has been thoroughly cleaned, documented, and optimized for production use."
+        ],
+        "Added": [
+          "**Production Documentation**: Comprehensive README.md with installation, configuration, and usage instructions",
+          "**Testing Checklist**: Streamlined testing guide for quality assurance",
+          "**Usage Examples**: USAGE_EXAMPLE.md included in production builds for developer reference"
+        ],
+        "Changed": [
+          "**Build Optimization**: Switched to esbuild minification (faster, no external dependencies)",
+          "**Production Assets**: Source maps disabled, console.log statements removed, optimized bundle sizes",
+          "**Distribution**: Production ZIP files now include USAGE_EXAMPLE.md for user reference"
+        ],
+        "Fixed": [
+          "**Build Process**: Fixed build configuration to use esbuild instead of terser (no external dependency required)",
+          "**Version Synchronization**: Ensured consistent versioning across package.json, plugin header, and CHANGELOG"
+        ],
+        "Code Quality": [
+          "**Debug Code Removal**: Removed all debug `error_log()` statements from production code\n  - Cleaned `class-rest.php` (13 statements removed)\n  - Cleaned `class-migration.php` (28 statements removed)\n  - Cleaned `class-settings.php` (10 statements removed)\n  - Cleaned `helpers.php` (7 statements removed)\n  - Cleaned `class-asset-loader.php` (8 statements removed)",
+          "**Security Review**: Verified all security best practices (sanitization, escaping, prepared statements, nonces)",
+          "**Performance**: Reviewed and optimized asset loading, database queries, and caching"
+        ],
+        "Documentation": [
+          "**README.md**: Complete documentation covering:\n  - Features overview\n  - Requirements (WordPress, PHP, ACF)\n  - Installation instructions\n  - Configuration guide\n  - Usage examples\n  - License information\n  - Support details",
+          "**CHANGELOG.md**: Comprehensive version history",
+          "**TESTING_CHECKLIST.md**: Practical testing guide for quality assurance"
+        ],
+        "Technical Improvements": [
+          "**Production Build**: Optimized Vite configuration for production\n  - Source maps disabled\n  - esbuild minification\n  - Proper asset optimization",
+          "**File Structure**: Verified production ZIP contains only necessary files",
+          "**Version Management**: Automated version synchronization in build process"
+        ],
+        "Migration Notes": [
+          "This release maintains full backward compatibility with version 0.6.0. No database migrations or breaking changes required."
+        ]
+      }
+    }
+  ]
+}
