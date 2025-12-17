@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOI;
+namespace ACFOIL;
 
 if (! defined('ABSPATH')) {
   exit;
@@ -11,20 +11,6 @@ class Providers {
 
   public function __construct() {
     $this->providers = [
-      'lucide'    => [
-        'label'          => 'Lucide',
-        'package'        => 'lucide-static',
-        'defaultVersion' => 'latest',
-        'licence'        => ['name' => 'ISC', 'url' => 'https://github.com/lucide-icons/lucide/blob/main/LICENSE'],
-        'pathTemplate'   => 'icons/{key}.svg',
-      ],
-      'tabler'    => [
-        'label'          => 'Tabler Icons',
-        'package'        => '@tabler/icons',
-        'defaultVersion' => 'latest',
-        'licence'        => ['name' => 'MIT', 'url' => 'https://github.com/tabler/tabler-icons/blob/master/LICENSE'],
-        'pathTemplate'   => 'icons/{key}.svg',
-      ],
       'heroicons' => [
         'label'          => 'Heroicons',
         'package'        => 'heroicons',

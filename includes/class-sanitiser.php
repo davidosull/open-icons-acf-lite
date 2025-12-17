@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOI;
+namespace ACFOIL;
 
 if (! defined('ABSPATH')) {
   exit;

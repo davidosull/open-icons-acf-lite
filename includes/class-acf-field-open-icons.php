@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOI;
+namespace ACFOIL;
 
 if (! defined('ABSPATH')) {
   exit;
@@ -14,11 +14,10 @@ class ACF_Field_Open_Icons extends \acf_field {
   private $providers;
   private $cache;
   private $sanitiser;
-  private $licence;
 
-  public function __construct(Providers $providers, Cache $cache, Sanitiser $sanitiser, ?Licence $licence = null) {
+  public function __construct(Providers $providers, Cache $cache, Sanitiser $sanitiser) {
     $this->name     = 'open_icons';
-    $this->label    = __('Open Icons', 'acf-open-icons');
+    $this->label    = __('Open Icons', 'acf-open-icons-lite');
     $this->category = 'content';
     $this->defaults = [
       'use_last_color' => 1,
@@ -27,14 +26,13 @@ class ACF_Field_Open_Icons extends \acf_field {
     $this->providers = $providers;
     $this->cache     = $cache;
     $this->sanitiser = $sanitiser;
-    $this->licence   = $licence ?? new Licence();
     parent::__construct();
   }
 
   public function render_field_settings($field) {
     acf_render_field_setting($field, [
-      'label'        => __('Use Last Color', 'acf-open-icons'),
-      'instructions' => __('When enabled, subsequent icon selections in the same context (repeater/flexible layout) will use the last selected color.', 'acf-open-icons'),
+      'label'        => __('Use Last Colour', 'acf-open-icons-lite'),
+      'instructions' => __('When enabled, subsequent icon selections in the same context (repeater/flexible layout) will use the last selected colour.', 'acf-open-icons-lite'),
       'name'         => 'use_last_color',
       'type'         => 'true_false',
       'ui'           => 1,
@@ -43,29 +41,24 @@ class ACF_Field_Open_Icons extends \acf_field {
   }
 
   public function render_field($field) {
-    $settings = wp_parse_args(get_option('acf_open_icons_settings', []), [
-      'activeProvider' => 'lucide',
+    $settings = wp_parse_args(get_option('acf_open_icons_lite_settings', []), [
+      'activeProvider' => 'heroicons',
       'pinnedVersion'  => 'latest',
     ]);
 
     $value   = is_array($field['value'] ?? null) ? $field['value'] : [];
     $stored  = $value['svg'] ?? '';
     $refKey  = esc_attr($value['iconKey'] ?? '');
-    // For the picker modal, always use current active provider/version (so users see current icon set)
-    // For stored values, use stored provider/version if icon exists, otherwise use current settings
-    $pickerProv = esc_attr($settings['activeProvider']); // Always use current for picker
-    $pickerVer  = esc_attr($settings['pinnedVersion']); // Always use current for picker
+    $pickerProv = esc_attr($settings['activeProvider']);
+    $pickerVer  = esc_attr($settings['pinnedVersion']);
     $refProv = esc_attr((!empty($refKey) && isset($value['provider'])) ? $value['provider'] : $settings['activeProvider']);
     $refVer  = esc_attr((!empty($refKey) && isset($value['version'])) ? $value['version'] : $settings['pinnedVersion']);
 
-    // If we have a colorToken, regenerate the SVG with current palette color
-    // This ensures the preview shows the current color even if the stored SVG has old color
     $color_token = $value['colorToken'] ?? null;
     if (!empty($color_token) && !empty($refKey) && !empty($stored)) {
       $palette = $settings['palette'] ?? [];
       $color_hex = null;
 
-      // Find the current color for this token
       if (is_array($palette)) {
         foreach ($palette as $item) {
           if (isset($item['token']) && $item['token'] === $color_token) {
@@ -75,38 +68,32 @@ class ACF_Field_Open_Icons extends \acf_field {
         }
       }
 
-      // If we found a color and it's different from what's in the stored SVG, regenerate
       if (!empty($color_hex)) {
-        // Get base SVG from cache (without color)
         $base_svg = $this->cache->get_svg($refProv, $refVer, $refKey);
         if (!empty($base_svg)) {
-          // Apply current color to base SVG
           $has_stroke = preg_match('/\bstroke(?!-)\s*=/i', $base_svg);
           $has_fill = preg_match('/\bfill(?!-)\s*=/i', $base_svg) && !preg_match('/fill\s*=\s*["\']none["\']/i', $base_svg);
 
           $new_svg = $base_svg;
 
-          // Apply color to stroke if present
           if ($has_stroke) {
             $new_svg = preg_replace('/\bstroke(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'stroke="' . esc_attr($color_hex) . '"', $new_svg);
           }
 
-          // Apply color to fill if present and not explicitly set to "none"
           if ($has_fill) {
             $new_svg = preg_replace('/\bfill(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'fill="' . esc_attr($color_hex) . '"', $new_svg);
           }
 
-          // Use the regenerated SVG for preview
           $stored = $new_svg;
         }
       }
     }
+
     $field_name = esc_attr($field['name']);
-    $instance_id = uniqid('acfoi_', false);
+    $instance_id = uniqid('acfoil_', false);
     $has_icon = !empty($refKey) && !empty($stored);
     $use_last_color = !empty($field['use_last_color']) ? '1' : '0';
 
-    // Get field group key - traverse up parent chain to find field group
     $field_group_key = '';
     $current_parent = $field['parent'] ?? '';
     while ($current_parent) {
@@ -117,7 +104,6 @@ class ACF_Field_Open_Icons extends \acf_field {
           break;
         }
       }
-      // Try as field instead
       if (function_exists('acf_get_field')) {
         $parent_field = acf_get_field($current_parent);
         if ($parent_field && isset($parent_field['parent'])) {
@@ -130,117 +116,50 @@ class ACF_Field_Open_Icons extends \acf_field {
       }
     }
 
-    // Field key for context identification
     $field_key = esc_attr($field['key'] ?? '');
-
-    // Check license status
-    $should_block_picker = $this->licence->should_block_picker();
-    $is_in_grace_period = $this->licence->is_in_grace_period();
-    $is_expired = $this->licence->is_expired();
-    $license_status = $this->licence->get_license_status();
-    $license_data = $this->licence->get_status();
-    $has_license_key = ! empty($license_data['license_key']);
-
-    // Show warning during grace period
-    $show_grace_warning = $is_in_grace_period;
-    $grace_days = 0;
-    if ($is_in_grace_period) {
-      $expires_at = $license_data['expires_at'] ?? null;
-      if ($expires_at) {
-        $expiry = strtotime($expires_at);
-        $now = time();
-        $days_since_expiry = floor(($now - $expiry) / DAY_IN_SECONDS);
-        $grace_days = max(0, 7 - $days_since_expiry);
-      }
-    }
 ?>
-    <div class="acfoi-field" id="<?php echo esc_attr($instance_id); ?>"
-      data-acfoi-provider="<?php echo $pickerProv; ?>"
-      data-acfoi-version="<?php echo $pickerVer; ?>"
-      data-acfoi-instance-id="<?php echo esc_attr($instance_id); ?>"
-      data-acfoi-use-last-color="<?php echo $use_last_color; ?>"
-      data-acfoi-field-key="<?php echo $field_key; ?>"
-      data-acfoi-field-group-key="<?php echo esc_attr($field_group_key); ?>"
-      data-acfoi-picker-blocked="<?php echo $should_block_picker ? '1' : '0'; ?>">
-      <input type="hidden" name="<?php echo $field_name; ?>[provider]" value="<?php echo $refProv; ?>" data-acfoi-provider-out />
-      <input type="hidden" name="<?php echo $field_name; ?>[version]" value="<?php echo $refVer; ?>" data-acfoi-version-out />
-      <input type="hidden" name="<?php echo $field_name; ?>[iconKey]" value="<?php echo $refKey; ?>" data-acfoi-key-out />
-      <input type="hidden" name="<?php echo $field_name; ?>[colorToken]" value="<?php echo esc_attr($value['colorToken'] ?? ''); ?>" data-acfoi-color-token-out />
-      <textarea class="acf-hidden" name="<?php echo $field_name; ?>[svg]" data-acfoi-svg-out><?php echo esc_textarea($stored); ?></textarea>
-      <?php
-      // Note: $stored may have been regenerated above with current palette color
-      // This ensures both the preview and the textarea show/save the current color
-      ?>
+    <div class="acfoil-field" id="<?php echo esc_attr($instance_id); ?>"
+      data-acfoil-provider="<?php echo $pickerProv; ?>"
+      data-acfoil-version="<?php echo $pickerVer; ?>"
+      data-acfoil-instance-id="<?php echo esc_attr($instance_id); ?>"
+      data-acfoil-use-last-color="<?php echo $use_last_color; ?>"
+      data-acfoil-field-key="<?php echo $field_key; ?>"
+      data-acfoil-field-group-key="<?php echo esc_attr($field_group_key); ?>">
+      <input type="hidden" name="<?php echo $field_name; ?>[provider]" value="<?php echo $refProv; ?>" data-acfoil-provider-out />
+      <input type="hidden" name="<?php echo $field_name; ?>[version]" value="<?php echo $refVer; ?>" data-acfoil-version-out />
+      <input type="hidden" name="<?php echo $field_name; ?>[iconKey]" value="<?php echo $refKey; ?>" data-acfoil-key-out />
+      <input type="hidden" name="<?php echo $field_name; ?>[colorToken]" value="<?php echo esc_attr($value['colorToken'] ?? ''); ?>" data-acfoil-color-token-out />
+      <textarea class="acf-hidden" name="<?php echo $field_name; ?>[svg]" data-acfoil-svg-out><?php echo esc_textarea($stored); ?></textarea>
 
-      <?php if ($show_grace_warning): ?>
-        <div class="notice notice-warning inline" style="margin: 0 0 10px 0;">
-          <p style="margin: 0.5em 0;">
-            <?php
-            echo esc_html(
-              sprintf(
-                __('License expired. You have %d day(s) remaining in the grace period. Please renew your license.', 'acf-open-icons'),
-                $grace_days
-              )
-            );
-            ?>
-          </p>
-        </div>
-      <?php endif; ?>
-
-      <?php if ($should_block_picker): ?>
-        <?php
-        $settings_url = admin_url('edit.php?post_type=acf-field-group&page=acf-open-icons');
-        $link_text = __('activate your license', 'acf-open-icons');
-        $message = sprintf(
-          __('Please %s to enable this field.', 'acf-open-icons'),
-          '<a href="' . esc_url($settings_url) . '" class="font-medium underline hover:text-yellow-900">' . esc_html($link_text) . '</a>'
-        );
-        ?>
-        <div class="mb-2.5 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
-          <?php echo $message; ?>
-        </div>
-      <?php endif; ?>
-
-      <div class="acfoi-preview-wrap" style="display:flex;align-items:center;gap:12px;">
-        <div class="acfoi-preview" style="width:40px;height:40px;border:1px solid #ddd;border-radius:4px;display:flex;align-items:center;justify-content:center;background:#fff;line-height:0;<?php echo $has_icon ? '' : 'display:none;'; ?>" title="<?php esc_attr_e('Click to change icon', 'acf-open-icons'); ?>" data-acfoi-preview>
+      <div class="acfoil-preview-wrap" style="display:flex;align-items:center;gap:12px;">
+        <div class="acfoil-preview" style="width:40px;height:40px;border:1px solid #ddd;border-radius:4px;display:flex;align-items:center;justify-content:center;background:#fff;line-height:0;<?php echo $has_icon ? '' : 'display:none;'; ?>" title="<?php esc_attr_e('Click to change icon', 'acf-open-icons-lite'); ?>" data-acfoil-preview>
           <?php echo $has_icon ? $stored : ''; ?>
         </div>
-        <div class="acfoi-actions" style="display:flex;gap:8px;">
-          <button class="button button-primary acfoi-select-button" type="button" data-acfoi-open <?php echo $should_block_picker ? 'disabled' : ''; ?>><?php echo $has_icon ? esc_html__('Change Icon', 'acf-open-icons') : esc_html__('Select Icon', 'acf-open-icons'); ?></button>
-          <button class="button" type="button" data-acfoi-clear style="<?php echo $has_icon ? '' : 'display:none;'; ?>"><?php esc_html_e('Remove', 'acf-open-icons'); ?></button>
+        <div class="acfoil-actions" style="display:flex;gap:8px;">
+          <button class="button button-primary acfoil-select-button" type="button" data-acfoil-open><?php echo $has_icon ? esc_html__('Change Icon', 'acf-open-icons-lite') : esc_html__('Select Icon', 'acf-open-icons-lite'); ?></button>
+          <button class="button" type="button" data-acfoil-clear style="<?php echo $has_icon ? '' : 'display:none;'; ?>"><?php esc_html_e('Remove', 'acf-open-icons-lite'); ?></button>
         </div>
       </div>
     </div>
     <script>
       (function() {
         const root = document.getElementById('<?php echo esc_js($instance_id); ?>');
-        const clearBtn = root.querySelector('[data-acfoi-clear]');
-        const openBtn = root.querySelector('[data-acfoi-open]');
-        const pickerBlocked = root.getAttribute('data-acfoi-picker-blocked') === '1';
-
-        // Block picker if license expired
-        if (pickerBlocked && openBtn) {
-          openBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            alert('<?php echo esc_js(__('License has expired. Please renew your license to select new icons.', 'acf-open-icons')); ?>');
-            return false;
-          });
-        }
+        const clearBtn = root.querySelector('[data-acfoil-clear]');
+        const openBtn = root.querySelector('[data-acfoil-open]');
 
         function clear() {
-          root.querySelector('[data-acfoi-key-out]').value = '';
-          root.querySelector('[data-acfoi-svg-out]').value = '';
-          const tokenInput = root.querySelector('[data-acfoi-color-token-out]');
+          root.querySelector('[data-acfoil-key-out]').value = '';
+          root.querySelector('[data-acfoil-svg-out]').value = '';
+          const tokenInput = root.querySelector('[data-acfoil-color-token-out]');
           if (tokenInput) tokenInput.value = '';
-          const preview = root.querySelector('[data-acfoi-preview]');
+          const preview = root.querySelector('[data-acfoil-preview]');
           if (preview) {
             preview.innerHTML = '';
             preview.style.display = 'none';
           }
           if (openBtn) {
             openBtn.style.display = '';
-            openBtn.textContent = '<?php echo esc_js(__('Select Icon', 'acf-open-icons')); ?>';
+            openBtn.textContent = '<?php echo esc_js(__('Select Icon', 'acf-open-icons-lite')); ?>';
           }
           if (clearBtn) clearBtn.style.display = 'none';
         }

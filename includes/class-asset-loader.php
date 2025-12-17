@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOI;
+namespace ACFOIL;
 
 if (! defined('ABSPATH')) {
   exit;
@@ -11,22 +11,22 @@ class Asset_Loader {
   private static $module_script_filters_added = false;
   private static $dev_mode_cache = null;
   private static $working_dev_host = null;
-  private const DEFAULT_DEV_HEALTH_PATH = '/_acfoi-dev-health';
-  private const DEV_HEALTH_HEADER = 'x-acfoi-dev-server';
-  private const DEV_HEALTH_HEADER_VALUE = 'acf-open-icons';
-  private const DEV_HEALTH_SIGNATURE = 'acfoi:dev:ok';
+  private const DEFAULT_DEV_HEALTH_PATH = '/_acfoil-dev-health';
+  private const DEV_HEALTH_HEADER = 'x-acfoil-dev-server';
+  private const DEV_HEALTH_HEADER_VALUE = 'acf-open-icons-lite';
+  private const DEV_HEALTH_SIGNATURE = 'acfoil:dev:ok';
 
   private static function get_dev_config(): array {
-    $scheme = defined('ACFOI_DEV_SERVER_SCHEME') ? (string) ACFOI_DEV_SERVER_SCHEME : 'http';
-    $host = defined('ACFOI_DEV_SERVER_HOST') ? (string) ACFOI_DEV_SERVER_HOST : '127.0.0.1';
-    $port = defined('ACFOI_DEV_SERVER_PORT') ? (int) ACFOI_DEV_SERVER_PORT : 5173;
+    $scheme = defined('ACFOIL_DEV_SERVER_SCHEME') ? (string) ACFOIL_DEV_SERVER_SCHEME : 'http';
+    $host = defined('ACFOIL_DEV_SERVER_HOST') ? (string) ACFOIL_DEV_SERVER_HOST : '127.0.0.1';
+    $port = defined('ACFOIL_DEV_SERVER_PORT') ? (int) ACFOIL_DEV_SERVER_PORT : 5173;
 
     /**
      * Filter dev server configuration.
      *
      * @param array $config Array with 'scheme', 'host', 'port' keys.
      */
-    $config = apply_filters('acfoi_dev_server_config', [
+    $config = apply_filters('acfoil_dev_server_config', [
       'scheme' => in_array(strtolower(trim($scheme)), ['http', 'https'], true) ? strtolower(trim($scheme)) : 'http',
       'host' => trim($host) ?: '127.0.0.1',
       'port' => $port > 0 ? $port : 5173,
@@ -115,7 +115,7 @@ class Asset_Loader {
     }
 
     // Manual override via .dev file
-    if (file_exists(ACFOI_PLUGIN_DIR . '.dev')) {
+    if (file_exists(ACFOIL_PLUGIN_DIR . '.dev')) {
       $config = self::get_dev_config();
       // Try to detect working host even with .dev file
       $working_host = self::try_hosts($config['port'], 0.5);
@@ -126,7 +126,7 @@ class Asset_Loader {
           self::$working_dev_host = $working_host;
         }
       }
-      $result = (bool) apply_filters('acfoi_is_dev_mode', true, ['reason' => 'dot_dev_flag']);
+      $result = (bool) apply_filters('acfoil_is_dev_mode', true, ['reason' => 'dot_dev_flag']);
       self::$dev_mode_cache = $result;
       return $result;
     }
@@ -136,7 +136,7 @@ class Asset_Loader {
     $working_host = self::try_hosts($config['port']);
 
     if (! $working_host) {
-      $result = (bool) apply_filters('acfoi_is_dev_mode', false, ['reason' => 'port_closed']);
+      $result = (bool) apply_filters('acfoil_is_dev_mode', false, ['reason' => 'port_closed']);
       self::$dev_mode_cache = $result;
       return $result;
     }
@@ -146,7 +146,7 @@ class Asset_Loader {
       self::$working_dev_host = $working_host;
     }
 
-    $result = (bool) apply_filters('acfoi_is_dev_mode', $health['ok'], [
+    $result = (bool) apply_filters('acfoil_is_dev_mode', $health['ok'], [
       'reason' => $health['ok'] ? 'health_check_passed' : 'health_check_failed',
       'error' => $health['error'] ?? null,
     ]);
@@ -201,7 +201,7 @@ class Asset_Loader {
     }
 
     add_filter('script_loader_tag', function ($tag, $handle) {
-      if (in_array($handle, ['acfoi-picker', 'acfoi-settings', 'acfoi-vite-client'], true)) {
+      if (in_array($handle, ['acfoil-picker', 'acfoil-settings', 'acfoil-vite-client'], true)) {
         // Clean up any existing type attribute and add correct one
         $tag = preg_replace('/type=["\'][^"\']*["\']\s*/', '', $tag);
         return str_replace('<script ', '<script type="module" ', $tag);
@@ -216,7 +216,7 @@ class Asset_Loader {
     $vite_url = self::get_vite_server_url();
 
     // Register vite client as a handle so other scripts can depend on it
-    wp_register_script('acfoi-vite-client', $vite_url . '/@vite/client', [], null, false);
+    wp_register_script('acfoil-vite-client', $vite_url . '/@vite/client', [], null, false);
 
     // Force type=module for the vite client
     self::ensure_module_script_filter();
@@ -230,17 +230,17 @@ window.$RefreshSig$ = () => (type) => type;
 window.__vite_plugin_react_preamble_installed__ = true;
 JS;
     $preamble = str_replace('%VITE_URL%', esc_url($vite_url), $preamble_tpl);
-    wp_add_inline_script('acfoi-vite-client', $preamble, 'before');
-    wp_enqueue_script('acfoi-vite-client');
+    wp_add_inline_script('acfoil-vite-client', $preamble, 'before');
+    wp_enqueue_script('acfoil-vite-client');
   }
 
   public static function enqueue_picker_assets(): void {
     // Get library info for the active provider
     $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
-    $provider = $settings['activeProvider'] ?? 'lucide';
+    $provider = $settings['activeProvider'] ?? 'heroicons';
 
     $manifestData = [];
-    $path = ACFOI_PLUGIN_DIR . 'includes/manifests/' . sanitize_file_name($provider) . '.php';
+    $path = ACFOIL_PLUGIN_DIR . 'includes/manifests/' . sanitize_file_name($provider) . '.php';
     if (file_exists($path)) {
       $manifestData = include $path;
       if (! is_array($manifestData)) {
@@ -249,7 +249,7 @@ JS;
     }
 
     // Extract library URL
-    $libraryUrl = $manifestData['library'] ?? 'https://lucide.dev/icons';
+    $libraryUrl = $manifestData['library'] ?? 'https://heroicons.com';
 
     if (self::is_dev_mode()) {
       // Development: ensure vite client + preamble are loaded first
@@ -257,9 +257,9 @@ JS;
 
       // Enqueue the main entry point with dependency on client
       wp_enqueue_script(
-        'acfoi-picker',
+        'acfoil-picker',
         self::get_vite_server_url() . '/src/picker.tsx',
-        ['acfoi-vite-client'],
+        ['acfoil-vite-client'],
         time(),
         true
       );
@@ -273,11 +273,11 @@ JS;
         $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
         $defaultToken = $settings['defaultToken'] ?? 'A';
         $providers = (new Providers())->all();
-        $providerLabel = $providers[$provider]['label'] ?? 'Lucide';
-        echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };</script>' . "\n";
+        $providerLabel = $providers[$provider]['label'] ?? 'Heroicons';
+        echo '<script>window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };</script>' . "\n";
       }, 5);
     } else {
-      $manifest_path = ACFOI_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
+      $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
       $manifest = [];
 
       if (! file_exists($manifest_path)) {
@@ -306,14 +306,14 @@ JS;
 
       // Enqueue all collected CSS
       foreach (array_unique($all_css) as $idx => $css_file) {
-        $handle = $idx === 0 ? 'acfoi-picker' : 'acfoi-picker-' . ($idx + 1);
-        $css_url = ACFOI_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
+        $handle = $idx === 0 ? 'acfoil-picker' : 'acfoil-picker-' . ($idx + 1);
+        $css_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
         wp_enqueue_style($handle, $css_url, [], '0.1.0');
       }
 
       // Enqueue JS as a module using the hashed file from the manifest
-      $js_url = ACFOI_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
-      wp_register_script('acfoi-picker', $js_url, [], '0.1.0', true);
+      $js_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
+      wp_register_script('acfoil-picker', $js_url, [], '0.1.0', true);
       // Ensure type="module" for Vite production output
       self::ensure_module_script_filter();
 
@@ -322,10 +322,10 @@ JS;
       $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
       $defaultToken = $settings['defaultToken'] ?? 'A';
       $providers = (new Providers())->all();
-      $providerLabel = $providers[$provider]['label'] ?? 'Lucide';
+      $providerLabel = $providers[$provider]['label'] ?? 'Heroicons';
 
-      wp_add_inline_script('acfoi-picker', 'window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };', 'before');
-      wp_enqueue_script('acfoi-picker');
+      wp_add_inline_script('acfoil-picker', 'window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };', 'before');
+      wp_enqueue_script('acfoil-picker');
     }
   }
 
@@ -336,18 +336,18 @@ JS;
     $defaultToken = $settings['defaultToken'] ?? 'A';
 
     // Get library info for the active provider
-    $provider = $settings['activeProvider'] ?? 'lucide';
+    $provider = $settings['activeProvider'] ?? 'heroicons';
     $manifestData = [];
-    $path = ACFOI_PLUGIN_DIR . 'includes/manifests/' . sanitize_file_name($provider) . '.php';
+    $path = ACFOIL_PLUGIN_DIR . 'includes/manifests/' . sanitize_file_name($provider) . '.php';
     if (file_exists($path)) {
       $manifestData = include $path;
       if (! is_array($manifestData)) {
         $manifestData = [];
       }
     }
-    $libraryUrl = $manifestData['library'] ?? 'https://lucide.dev/icons';
+    $libraryUrl = $manifestData['library'] ?? 'https://heroicons.com';
     $providers = (new Providers())->all();
-    $providerLabel = $providers[$provider]['label'] ?? 'Lucide';
+    $providerLabel = $providers[$provider]['label'] ?? 'Heroicons';
 
     // Provide REST API settings for JavaScript (must be available before module scripts)
     // Output directly in admin_head to ensure it's available early
@@ -362,18 +362,18 @@ JS;
     if (self::is_dev_mode()) {
       self::enqueue_vite_client_with_preamble();
       wp_enqueue_script(
-        'acfoi-settings',
+        'acfoil-settings',
         self::get_vite_server_url() . '/src/settings.tsx',
-        ['acfoi-vite-client'],
+        ['acfoil-vite-client'],
         time(),
         true
       );
       self::ensure_module_script_filter();
       add_action('admin_footer', function () use ($palette, $defaultToken, $libraryUrl, $providerLabel) {
-        echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };</script>' . "\n";
+        echo '<script>window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };</script>' . "\n";
       }, 5);
     } else {
-      $manifest_path = ACFOI_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
+      $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
       $manifest = [];
 
       if (! file_exists($manifest_path)) {
@@ -402,26 +402,26 @@ JS;
 
       // Enqueue all collected CSS
       foreach (array_unique($all_css) as $idx => $css_file) {
-        $handle = $idx === 0 ? 'acfoi-settings' : 'acfoi-settings-' . ($idx + 1);
-        $css_url = ACFOI_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
+        $handle = $idx === 0 ? 'acfoil-settings' : 'acfoil-settings-' . ($idx + 1);
+        $css_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
         wp_enqueue_style($handle, $css_url, [], '0.1.0');
       }
 
       // Enqueue JS as a module using the hashed file from the manifest
-      $js_url = ACFOI_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
-      wp_register_script('acfoi-settings', $js_url, [], '0.1.0', true);
+      $js_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
+      wp_register_script('acfoil-settings', $js_url, [], '0.1.0', true);
       // Ensure type="module" for Vite production output
       self::ensure_module_script_filter();
 
       // Provide REST API settings (also output in admin_head for dev mode, but ensure it's here too)
-      wp_localize_script('acfoi-settings', 'wpApiSettings', [
+      wp_localize_script('acfoil-settings', 'wpApiSettings', [
         'root' => esc_url_raw(rest_url()),
         'nonce' => wp_create_nonce('wp_rest'),
       ]);
 
       // Provide palette and library info before the module executes
-      wp_add_inline_script('acfoi-settings', 'window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };', 'before');
-      wp_enqueue_script('acfoi-settings');
+      wp_add_inline_script('acfoil-settings', 'window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };', 'before');
+      wp_enqueue_script('acfoil-settings');
     }
   }
 }

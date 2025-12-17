@@ -69,9 +69,9 @@ function acf_open_icon($value = null, $atts = []) {
   } elseif (! empty($value['colorToken']) && ! empty($value['provider']) && ! empty($iconKey)) {
     // Fallback: If no stored SVG but we have colorToken, fetch from cache and apply color
     // This handles edge cases where SVG wasn't stored
-    $providers = new \ACFOI\Providers();
-    $sanitiser = new \ACFOI\Sanitiser();
-    $cache     = new \ACFOI\Cache($providers, $sanitiser);
+    $providers = new \ACFOIL\Providers();
+    $sanitiser = new \ACFOIL\Sanitiser();
+    $cache     = new \ACFOIL\Cache($providers, $sanitiser);
 
     $provider = sanitize_key($value['provider']);
     $version  = sanitize_text_field($value['version'] ?? 'latest');
@@ -83,7 +83,7 @@ function acf_open_icon($value = null, $atts = []) {
     if ($svg) {
       // Get current color from settings based on token (unless override provided)
       if (empty($atts['color'])) {
-        $settings = get_option('acf_open_icons_settings', []);
+        $settings = get_option('acf_open_icons_lite_settings', []);
         $palette  = $settings['palette'] ?? [];
         if (is_array($palette)) {
           foreach ($palette as $item) {

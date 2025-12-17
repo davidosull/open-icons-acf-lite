@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOI;
+namespace ACFOIL;
 
 if (! defined('ABSPATH')) {
   exit;
@@ -17,7 +17,7 @@ class Cache {
 
   public function base_dir(): string {
     $uploads = wp_upload_dir();
-    return trailingslashit($uploads['basedir']) . 'acf-open-icons/cache/';
+    return trailingslashit($uploads['basedir']) . 'acf-open-icons-lite/cache/';
   }
 
   public function path_for(string $provider, string $version, string $key): string {
