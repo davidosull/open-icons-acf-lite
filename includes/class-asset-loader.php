@@ -6,6 +6,9 @@ if (! defined('ABSPATH')) {
   exit;
 }
 
+/**
+ * Asset loader for ACF Open Icons Lite.
+ */
 class Asset_Loader {
 
   private static $module_script_filters_added = false;
@@ -19,23 +22,18 @@ class Asset_Loader {
   private static function get_dev_config(): array {
     $scheme = defined('ACFOIL_DEV_SERVER_SCHEME') ? (string) ACFOIL_DEV_SERVER_SCHEME : 'http';
     $host = defined('ACFOIL_DEV_SERVER_HOST') ? (string) ACFOIL_DEV_SERVER_HOST : '127.0.0.1';
-    $port = defined('ACFOIL_DEV_SERVER_PORT') ? (int) ACFOIL_DEV_SERVER_PORT : 5173;
+    $port = defined('ACFOIL_DEV_SERVER_PORT') ? (int) ACFOIL_DEV_SERVER_PORT : 5174;
 
-    /**
-     * Filter dev server configuration.
-     *
-     * @param array $config Array with 'scheme', 'host', 'port' keys.
-     */
     $config = apply_filters('acfoil_dev_server_config', [
       'scheme' => in_array(strtolower(trim($scheme)), ['http', 'https'], true) ? strtolower(trim($scheme)) : 'http',
       'host' => trim($host) ?: '127.0.0.1',
-      'port' => $port > 0 ? $port : 5173,
+      'port' => $port > 0 ? $port : 5174,
     ]);
 
     return [
       'scheme' => $config['scheme'] ?? 'http',
       'host' => $config['host'] ?? '127.0.0.1',
-      'port' => $config['port'] ?? 5173,
+      'port' => $config['port'] ?? 5174,
     ];
   }
 
@@ -54,7 +52,6 @@ class Asset_Loader {
     $config = self::get_dev_config();
     $hosts = [$config['host']];
 
-    // Add alternative host if needed
     if ($config['host'] === '127.0.0.1') {
       $hosts[] = 'localhost';
     } elseif ($config['host'] === 'localhost') {
@@ -117,7 +114,6 @@ class Asset_Loader {
     // Manual override via .dev file
     if (file_exists(ACFOIL_PLUGIN_DIR . '.dev')) {
       $config = self::get_dev_config();
-      // Try to detect working host even with .dev file
       $working_host = self::try_hosts($config['port'], 0.5);
       if ($working_host) {
         self::$working_dev_host = $working_host;
@@ -159,9 +155,6 @@ class Asset_Loader {
     return self::build_dev_server_url();
   }
 
-  /**
-   * Recursively collect all CSS files from an entry and its imports
-   */
   private static function collect_css_from_manifest(array $manifest, string $entry_key, array &$collected = [], array &$visited = []): array {
     if (isset($visited[$entry_key])) {
       return $collected;
@@ -173,7 +166,6 @@ class Asset_Loader {
       return $collected;
     }
 
-    // Collect CSS from this entry
     if (! empty($entry['css']) && is_array($entry['css'])) {
       foreach ($entry['css'] as $css_file) {
         if (! in_array($css_file, $collected, true)) {
@@ -182,7 +174,6 @@ class Asset_Loader {
       }
     }
 
-    // Recursively collect from imports
     if (! empty($entry['imports']) && is_array($entry['imports'])) {
       foreach ($entry['imports'] as $import_key) {
         self::collect_css_from_manifest($manifest, $import_key, $collected, $visited);
@@ -192,9 +183,6 @@ class Asset_Loader {
     return $collected;
   }
 
-  /**
-   * Ensure module script filter is added (only once)
-   */
   private static function ensure_module_script_filter(): void {
     if (self::$module_script_filters_added) {
       return;
@@ -202,7 +190,6 @@ class Asset_Loader {
 
     add_filter('script_loader_tag', function ($tag, $handle) {
       if (in_array($handle, ['acfoil-picker', 'acfoil-settings', 'acfoil-vite-client'], true)) {
-        // Clean up any existing type attribute and add correct one
         $tag = preg_replace('/type=["\'][^"\']*["\']\s*/', '', $tag);
         return str_replace('<script ', '<script type="module" ', $tag);
       }
@@ -215,13 +202,9 @@ class Asset_Loader {
   private static function enqueue_vite_client_with_preamble(): void {
     $vite_url = self::get_vite_server_url();
 
-    // Register vite client as a handle so other scripts can depend on it
     wp_register_script('acfoil-vite-client', $vite_url . '/@vite/client', [], null, false);
-
-    // Force type=module for the vite client
     self::ensure_module_script_filter();
 
-    // Inject preamble BEFORE vite client so plugin-react detects it (escape $ variables)
     $preamble_tpl = <<<'JS'
 import RefreshRuntime from '%VITE_URL%/@react-refresh';
 RefreshRuntime.injectIntoGlobalHook(window);
@@ -235,27 +218,14 @@ JS;
   }
 
   public static function enqueue_picker_assets(): void {
-    // Get library info for the active provider
     $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
-    $provider = $settings['activeProvider'] ?? 'heroicons';
+    $provider = 'heroicons';
 
-    $manifestData = [];
-    $path = ACFOIL_PLUGIN_DIR . 'includes/manifests/' . sanitize_file_name($provider) . '.php';
-    if (file_exists($path)) {
-      $manifestData = include $path;
-      if (! is_array($manifestData)) {
-        $manifestData = [];
-      }
-    }
-
-    // Extract library URL
-    $libraryUrl = $manifestData['library'] ?? 'https://heroicons.com';
+    $libraryUrl = 'https://heroicons.com';
 
     if (self::is_dev_mode()) {
-      // Development: ensure vite client + preamble are loaded first
       self::enqueue_vite_client_with_preamble();
 
-      // Enqueue the main entry point with dependency on client
       wp_enqueue_script(
         'acfoil-picker',
         self::get_vite_server_url() . '/src/picker.tsx',
@@ -264,24 +234,19 @@ JS;
         true
       );
 
-      // Mark as module
       self::ensure_module_script_filter();
 
-      // Add inline BEFORE the module script
-      add_action('admin_footer', function () use ($libraryUrl, $provider) {
+      add_action('admin_footer', function () use ($libraryUrl) {
         $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
         $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
         $defaultToken = $settings['defaultToken'] ?? 'A';
-        $providers = (new Providers())->all();
-        $providerLabel = $providers[$provider]['label'] ?? 'Heroicons';
-        echo '<script>window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };</script>' . "\n";
+        echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true;</script>' . "\n";
       }, 5);
     } else {
       $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
       $manifest = [];
 
       if (! file_exists($manifest_path)) {
-        // Manifest doesn't exist - this is an error condition
         return;
       }
 
@@ -301,62 +266,42 @@ JS;
         return;
       }
 
-      // Recursively collect all CSS from entry and its imports
       $all_css = self::collect_css_from_manifest($manifest, 'src/picker.tsx');
 
-      // Enqueue all collected CSS
       foreach (array_unique($all_css) as $idx => $css_file) {
         $handle = $idx === 0 ? 'acfoil-picker' : 'acfoil-picker-' . ($idx + 1);
         $css_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
-        wp_enqueue_style($handle, $css_url, [], '0.1.0');
+        wp_enqueue_style($handle, $css_url, [], ACFOIL_VERSION);
       }
 
-      // Enqueue JS as a module using the hashed file from the manifest
       $js_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
-      wp_register_script('acfoil-picker', $js_url, [], '0.1.0', true);
-      // Ensure type="module" for Vite production output
+      wp_register_script('acfoil-picker', $js_url, [], ACFOIL_VERSION, true);
       self::ensure_module_script_filter();
 
-      // Provide palette and library info before the module executes
       $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
       $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
       $defaultToken = $settings['defaultToken'] ?? 'A';
-      $providers = (new Providers())->all();
-      $providerLabel = $providers[$provider]['label'] ?? 'Heroicons';
 
-      wp_add_inline_script('acfoil-picker', 'window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };', 'before');
+      wp_add_inline_script('acfoil-picker', 'window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true;', 'before');
       wp_enqueue_script('acfoil-picker');
     }
   }
 
   public static function enqueue_settings_assets(): void {
-    // Localise palette for settings UI as well
     $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
     $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
     $defaultToken = $settings['defaultToken'] ?? 'A';
+    $libraryUrl = 'https://heroicons.com';
 
-    // Get library info for the active provider
-    $provider = $settings['activeProvider'] ?? 'heroicons';
-    $manifestData = [];
-    $path = ACFOIL_PLUGIN_DIR . 'includes/manifests/' . sanitize_file_name($provider) . '.php';
-    if (file_exists($path)) {
-      $manifestData = include $path;
-      if (! is_array($manifestData)) {
-        $manifestData = [];
-      }
-    }
-    $libraryUrl = $manifestData['library'] ?? 'https://heroicons.com';
-    $providers = (new Providers())->all();
-    $providerLabel = $providers[$provider]['label'] ?? 'Heroicons';
+    // Get tracking status
+    $tracking = new Tracking();
+    $trackingStatus = $tracking->get_status();
 
-    // Provide REST API settings for JavaScript (must be available before module scripts)
-    // Output directly in admin_head to ensure it's available early
-    add_action('admin_head', function () {
-      // Always output - don't check for wp-api script
+    add_action('admin_head', function () use ($trackingStatus) {
       echo '<script>window.wpApiSettings = window.wpApiSettings || ' . wp_json_encode([
         'root' => esc_url_raw(rest_url()),
         'nonce' => wp_create_nonce('wp_rest'),
-      ]) . ';</script>' . "\n";
+      ]) . '; window.__ACFOIL_TRACKING__ = ' . wp_json_encode($trackingStatus) . ';</script>' . "\n";
     }, 1);
 
     if (self::is_dev_mode()) {
@@ -369,15 +314,14 @@ JS;
         true
       );
       self::ensure_module_script_filter();
-      add_action('admin_footer', function () use ($palette, $defaultToken, $libraryUrl, $providerLabel) {
-        echo '<script>window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };</script>' . "\n";
+      add_action('admin_footer', function () use ($palette, $defaultToken, $libraryUrl) {
+        echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true;</script>' . "\n";
       }, 5);
     } else {
       $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
       $manifest = [];
 
       if (! file_exists($manifest_path)) {
-        // Manifest doesn't exist - this is an error condition
         return;
       }
 
@@ -397,30 +341,24 @@ JS;
         return;
       }
 
-      // Recursively collect all CSS from entry and its imports
       $all_css = self::collect_css_from_manifest($manifest, 'src/settings.tsx');
 
-      // Enqueue all collected CSS
       foreach (array_unique($all_css) as $idx => $css_file) {
         $handle = $idx === 0 ? 'acfoil-settings' : 'acfoil-settings-' . ($idx + 1);
         $css_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
-        wp_enqueue_style($handle, $css_url, [], '0.1.0');
+        wp_enqueue_style($handle, $css_url, [], ACFOIL_VERSION);
       }
 
-      // Enqueue JS as a module using the hashed file from the manifest
       $js_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
-      wp_register_script('acfoil-settings', $js_url, [], '0.1.0', true);
-      // Ensure type="module" for Vite production output
+      wp_register_script('acfoil-settings', $js_url, [], ACFOIL_VERSION, true);
       self::ensure_module_script_filter();
 
-      // Provide REST API settings (also output in admin_head for dev mode, but ensure it's here too)
       wp_localize_script('acfoil-settings', 'wpApiSettings', [
         'root' => esc_url_raw(rest_url()),
         'nonce' => wp_create_nonce('wp_rest'),
       ]);
 
-      // Provide palette and library info before the module executes
-      wp_add_inline_script('acfoil-settings', 'window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: ' . wp_json_encode($providerLabel) . ' };', 'before');
+      wp_add_inline_script('acfoil-settings', 'window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true; window.__ACFOIL_TRACKING__ = ' . wp_json_encode($trackingStatus) . ';', 'before');
       wp_enqueue_script('acfoil-settings');
     }
   }

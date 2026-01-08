@@ -1,7 +1,7 @@
 {
-  "name": "acf-open-icons",
+  "name": "acf-open-icons-lite",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

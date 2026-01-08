@@ -1,131 +1,105 @@
-=== ACF Open Icons - Lite ===
-Contributors: davidosull
-Tags: acf, icons, heroicons, advanced custom fields, icon picker, svg
-Requires at least: 6.0
-Tested up to: 6.7
-Stable tag: 1.0.0
+=== ACF Open Icons Lite ===
+Contributors: osullivanio
+Tags: acf, icons, svg, heroicons, custom fields
+Requires at least: 5.8
+Tested up to: 6.4
 Requires PHP: 7.4
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A beautiful icon picker field for Advanced Custom Fields, featuring 300+ Heroicons with colour palette support and SVG caching.
+A beautiful icon picker field for Advanced Custom Fields using Heroicons. Pick from 292 hand-crafted SVG icons.
 
 == Description ==
 
-**ACF Open Icons - Lite** adds a powerful icon picker field to Advanced Custom Fields. Choose from 300+ beautifully crafted Heroicons and apply custom colours using a simple palette system.
+ACF Open Icons Lite adds a custom field type to Advanced Custom Fields (ACF) that lets you select and display beautiful SVG icons from the Heroicons library.
 
-= Features =
+**Features:**
 
-* **300+ Heroicons** - Access the complete Heroicons outline set by Tailwind Labs
-* **Colour Palette** - Define up to 3 brand colours and apply them to any icon
-* **SVG Caching** - Icons are cached locally for fast loading
-* **Clean Output** - Sanitised SVG output safe for your templates
-* **Easy to Use** - Simple, intuitive icon picker modal
+* **292 Heroicons** - Beautiful, hand-crafted SVG icons by the makers of Tailwind CSS
+* **Colour palette** - Define up to 3 colour tokens and apply them to icons
+* **Smart caching** - Icons are cached locally for optimal performance
+* **Clean output** - Simple `acf_open_icon()` helper function for displaying icons
+* **Sanitised SVGs** - All icons are sanitised for security
 
-= How It Works =
+**How it works:**
 
-1. Create an ACF field group with an "Open Icons" field
-2. Select icons from the picker modal
-3. Apply colours from your defined palette
-4. Output icons in your theme using the helper function
+1. Add an "Open Icons" field to your ACF field group
+2. Select an icon and colour from the beautiful picker interface
+3. Display the icon in your theme using the `acf_open_icon()` function
 
-= Template Usage =
+**Display icons in your theme:**
 
-Display an icon in your theme:
+`php
+<?php
+$icon = get_field('your_icon_field');
+acf_open_icon($icon, ['size' => 24, 'class' => 'my-icon']);
+?>
+`
 
-`<?php
-$icon = get_field('my_icon_field');
-if ($icon) {
-    acf_open_icon($icon, ['size' => 24]);
-}
-?>`
+**Want more icons?**
 
-= Want More Icons? =
+[ACF Open Icons Premium](https://acfopenicons.com) unlocks:
 
-Upgrade to [ACF Open Icons Pro](https://acfopenicons.com) for:
-
-* 15,000+ icons from Lucide, Tabler, and Heroicons
-* Icon library migration tools
+* **Lucide Icons** - 1,500+ icons
+* **Tabler Icons** - 5,200+ icons
+* Icon migration tools when switching providers
 * Priority support
-* Automatic updates
 
 == Installation ==
 
-= Automatic Installation =
-
-1. Go to Plugins > Add New in your WordPress admin
-2. Search for "ACF Open Icons"
-3. Click "Install Now" then "Activate"
-
-= Manual Installation =
-
-1. Download the plugin zip file
-2. Go to Plugins > Add New > Upload Plugin
-3. Upload the zip file and click "Install Now"
-4. Activate the plugin
-
-= Requirements =
-
-* WordPress 6.0 or higher
-* PHP 7.4 or higher
-* Advanced Custom Fields 6.0 or higher (free or Pro)
+1. Upload the `acf-open-icons-lite` folder to the `/wp-content/plugins/` directory
+2. Activate the plugin through the 'Plugins' menu in WordPress
+3. Ensure you have Advanced Custom Fields installed and activated
+4. Create a new field with the "Open Icons" type
 
 == Frequently Asked Questions ==
 
-= Does this work with ACF Free? =
+= Does this plugin require ACF? =
 
-Yes! ACF Open Icons - Lite works with both the free version of ACF and ACF Pro.
+Yes, ACF Open Icons Lite requires Advanced Custom Fields (free or Pro) to be installed and activated.
 
-= How do I output icons in my theme? =
+= Can I use this with ACF PRO? =
 
-Use the `acf_open_icon()` helper function:
+Absolutely! ACF Open Icons Lite works with both the free version of ACF and ACF PRO.
 
-`<?php acf_open_icon($icon, ['size' => 32, 'class' => 'my-icon']); ?>`
+= Can I have both Lite and Premium versions active? =
 
-= Can I change the icon colour? =
+No. The plugin will automatically prevent you from activating both versions simultaneously to avoid conflicts.
 
-Yes! You can define up to 3 palette colours in the plugin settings. Each icon can use any colour from your palette. You can also override colours in templates:
+= How do I display an icon in my theme? =
 
-`<?php acf_open_icon($icon, ['color' => '#ff0000']); ?>`
+Use the `acf_open_icon()` function:
 
-= Where are the icons stored? =
+`php
+$icon = get_field('icon');
+acf_open_icon($icon, ['size' => 24, 'class' => 'my-icon']);
+`
 
-Icons are fetched from CDN on first use and cached locally in your uploads folder for fast subsequent loads.
+= Can I change the icon colour dynamically? =
 
-= How do I clear the icon cache? =
+Yes! Pass a `color` parameter:
 
-Go to ACF > Open Icons in your WordPress admin and click "Purge Icon Cache".
+`php
+acf_open_icon($icon, ['color' => '#ff0000']);
+`
 
-= What's the difference between Lite and Pro? =
+= What icons are included? =
 
-**Lite (Free):**
-* 300+ Heroicons
-* Colour palette support
-* SVG caching
-
-**Pro ($5/month or $40/year):**
-* 15,000+ icons (Lucide, Tabler, Heroicons)
-* Icon library migration tools
-* Switch between icon libraries easily
-* Priority support
+The Lite version includes the full Heroicons library (292 icons). For access to Lucide (1,500+ icons) and Tabler (5,200+ icons), consider upgrading to Premium.
 
 == Screenshots ==
 
-1. The icon picker modal showing available Heroicons
-2. Plugin settings page with colour palette configuration
-3. An ACF field with a selected icon
+1. The icon picker modal with search and colour selection
+2. Icon field in the WordPress editor
+3. Settings page with colour palette configuration
 
 == Changelog ==
 
 = 1.0.0 =
 * Initial release
-* 300+ Heroicons included
-* Colour palette support with 3 customisable tokens
-* SVG caching for performance
-* Clean, sanitised SVG output
-* Helper function for theme templates
 
 == Upgrade Notice ==
 
 = 1.0.0 =
-Initial release of ACF Open Icons - Lite.
+Initial release of ACF Open Icons Lite.

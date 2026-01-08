@@ -6,6 +6,9 @@ if (! defined('ABSPATH')) {
   exit;
 }
 
+/**
+ * Icon cache for ACF Open Icons Lite.
+ */
 class Cache {
   private $providers;
   private $sanitiser;
@@ -17,7 +20,7 @@ class Cache {
 
   public function base_dir(): string {
     $uploads = wp_upload_dir();
-    return trailingslashit($uploads['basedir']) . 'acf-open-icons-lite/cache/';
+    return trailingslashit($uploads['basedir']) . 'acf-open-icons/cache/';
   }
 
   public function path_for(string $provider, string $version, string $key): string {
@@ -41,7 +44,6 @@ class Cache {
   }
 
   public function fetch_and_store(string $provider, string $version, string $key): ?string {
-    $fetch_start = microtime(true);
     $meta = $this->providers->get($provider);
     if (! $meta) {
       return null;
@@ -56,24 +58,6 @@ class Cache {
     $code = wp_remote_retrieve_response_code($response);
     $body = wp_remote_retrieve_body($response);
     if ($code !== 200 || empty($body)) {
-      // Try alternative URL encoding if the first attempt failed
-      if ($code === 404) {
-        $alt_cdn = $this->build_cdn_url_alternative($meta, $version, $key);
-        if ($alt_cdn !== $cdn) {
-          $alt_response = wp_remote_get($alt_cdn, ['timeout' => 15]);
-          if (! is_wp_error($alt_response)) {
-            $alt_code = wp_remote_retrieve_response_code($alt_response);
-            $alt_body = wp_remote_retrieve_body($alt_response);
-            if ($alt_code === 200 && ! empty($alt_body)) {
-              $sanitised = $this->sanitiser->sanitise($alt_body);
-              $sanitised = str_replace('\\"', '"', $sanitised);
-              $file      = $this->path_for($provider, $version, $key);
-              file_put_contents($file, $sanitised);
-              return $sanitised;
-            }
-          }
-        }
-      }
       return null;
     }
 
@@ -138,7 +122,7 @@ class Cache {
     do {
       $status = curl_multi_exec($multi_handle, $running);
       if ($running > 0) {
-        curl_multi_select($multi_handle, 0.1); // Wait for activity
+        curl_multi_select($multi_handle, 0.1);
       }
     } while ($running > 0 && $status === CURLM_OK);
 
@@ -147,7 +131,6 @@ class Cache {
       $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
       $body = curl_multi_getcontent($ch);
       $error = curl_error($ch);
-      $url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
 
       if ($error) {
         curl_multi_remove_handle($multi_handle, $ch);
@@ -161,33 +144,6 @@ class Cache {
         $file = $this->path_for($provider, $version, $key);
         file_put_contents($file, $sanitised);
         $results[$key] = $sanitised;
-      } else {
-        // Try alternative URL for 404 errors
-        if ($http_code === 404) {
-          $alt_url = $this->build_cdn_url_alternative($meta, $version, $key);
-          if ($alt_url !== $url) {
-            $alt_ch = curl_init($alt_url);
-            curl_setopt_array($alt_ch, [
-              CURLOPT_RETURNTRANSFER => true,
-              CURLOPT_FOLLOWLOCATION => true,
-              CURLOPT_TIMEOUT => 15,
-              CURLOPT_CONNECTTIMEOUT => 10,
-              CURLOPT_SSL_VERIFYPEER => true,
-              CURLOPT_USERAGENT => 'WordPress/' . get_bloginfo('version') . '; ' . home_url(),
-            ]);
-            $alt_body = curl_exec($alt_ch);
-            $alt_http_code = curl_getinfo($alt_ch, CURLINFO_HTTP_CODE);
-            curl_close($alt_ch);
-
-            if ($alt_http_code === 200 && ! empty($alt_body)) {
-              $sanitised = $this->sanitiser->sanitise($alt_body);
-              $sanitised = str_replace('\\"', '"', $sanitised);
-              $file = $this->path_for($provider, $version, $key);
-              file_put_contents($file, $sanitised);
-              $results[$key] = $sanitised;
-            }
-          }
-        }
       }
 
       curl_multi_remove_handle($multi_handle, $ch);
@@ -203,48 +159,10 @@ class Cache {
     $package = $meta['package'];
     $path    = str_replace('{key}', $key, $meta['pathTemplate']);
     $ver     = $version === 'latest' ? '' : '@' . $version;
+    $path_trimmed = ltrim($path, '/');
 
-    // For Tabler Icons, icons are in outline/ and filled/ subdirectories
-    // Try outline first (default style), then filled as fallback
-    if ($package === '@tabler/icons') {
-      // Try outline first (default)
-      $path_outline = str_replace('icons/', 'icons/outline/', $path);
-      $path_trimmed = ltrim($path_outline, '/');
-    } else {
-      $path_trimmed = ltrim($path, '/');
-    }
-
-    // Use jsdelivr for icon fetching (more reliable than unpkg)
-    // For scoped packages like @tabler/icons, jsdelivr needs the @scope/package unencoded
-    // Format: https://cdn.jsdelivr.net/npm/@scope/package@version/path
-    if (strpos($package, '@') === 0) {
-      // Scoped package - don't encode @scope/package part, jsdelivr handles it
-      return 'https://cdn.jsdelivr.net/npm/' . $package . $ver . '/' . $path_trimmed;
-    } else {
-      // Regular package - encode normally
-      return 'https://cdn.jsdelivr.net/npm/' . rawurlencode($package . $ver) . '/' . $path_trimmed;
-    }
-  }
-
-  /**
-   * Build alternative CDN URL - try filled variant for Tabler, or unpkg for others
-   * Fallback if outline variant doesn't work
-   */
-  private function build_cdn_url_alternative(array $meta, string $version, string $key): string {
-    $package = $meta['package'];
-    $path    = str_replace('{key}', $key, $meta['pathTemplate']);
-    $ver     = $version === 'latest' ? '' : '@' . $version;
-
-    // For Tabler Icons, try filled variant as fallback
-    if ($package === '@tabler/icons') {
-      $path_filled = str_replace('icons/', 'icons/filled/', $path);
-      $path_trimmed = ltrim($path_filled, '/');
-      return 'https://cdn.jsdelivr.net/npm/' . $package . $ver . '/' . $path_trimmed;
-    } else {
-      // For other providers, try unpkg as fallback
-      $path_trimmed = ltrim($path, '/');
-      return 'https://unpkg.com/' . $package . $ver . '/' . $path_trimmed;
-    }
+    // Use jsdelivr for icon fetching
+    return 'https://cdn.jsdelivr.net/npm/' . rawurlencode($package . $ver) . '/' . $path_trimmed;
   }
 
   public function purge(string $provider, string $version): void {

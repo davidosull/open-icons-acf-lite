@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
 const buildsDir = join(rootDir, 'builds');
-const pluginName = 'acf-open-icons';
+const pluginName = 'acf-open-icons-lite';
 
 // Read version from package.json
 const packageJson = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));
@@ -16,9 +16,9 @@ const version = packageJson.version;
 
 console.log(`Building distribution packages for version ${version}...`);
 
-// Sync version to acf-open-icons.php
-console.log('Syncing version to acf-open-icons.php...');
-const pluginFile = join(rootDir, 'acf-open-icons.php');
+// Sync version to acf-open-icons-lite.php
+console.log('Syncing version to acf-open-icons-lite.php...');
+const pluginFile = join(rootDir, 'acf-open-icons-lite.php');
 let pluginContent = readFileSync(pluginFile, 'utf8');
 pluginContent = pluginContent.replace(/Version:\s*[\d.]+/, `Version: ${version}`);
 writeFileSync(pluginFile, pluginContent);
@@ -55,12 +55,13 @@ const excludePatterns = [
   '.idea',
 ];
 
-// Production files (only acf-open-icons.php, includes/, assets/, USAGE_EXAMPLE.md)
+// Production files for WordPress.org submission
 const productionFiles = [
-  'acf-open-icons.php',
+  'acf-open-icons-lite.php',
   'includes',
   'assets',
-  'USAGE_EXAMPLE.md',
+  'readme.txt',
+  'LICENSE',
 ];
 
 // Helper function to check if a path should be excluded

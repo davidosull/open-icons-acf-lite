@@ -389,7 +389,7 @@ function getLastColor(
       const storedColor = JSON.parse(stored);
       // Always resolve hex from current palette to ensure we use current color values
       // The stored hex might be outdated if palette colors changed
-      const palette: { token: string; hex: string }[] = (window as any).__ACFOIL_PALETTE__?.items || [];
+      const palette: { token: string; hex: string }[] = (window as any).__ACFOI_PALETTE__?.items || [];
       const currentPaletteItem = palette.find((p) => p.token === storedColor.token);
       if (currentPaletteItem) {
         return {
@@ -530,13 +530,13 @@ export default function IconPicker({
   const [query, setQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const palette: { token: string; label?: string; hex: string }[] =
-    (window as any).__ACFOIL_PALETTE__?.items || [];
+    (window as any).__ACFOI_PALETTE__?.items || [];
   const defaultToken: string =
-    (window as any).__ACFOIL_PALETTE__?.default || 'A';
+    (window as any).__ACFOI_PALETTE__?.default || 'A';
   const defaultHex =
     palette.find((i) => i.token === defaultToken)?.hex || '#111111';
   const libraryInfo: { url: string; name: string } = (window as any)
-    .__ACFOIL_LIBRARY__ || { url: 'https://lucide.dev/icons', name: 'Lucide' };
+    .__ACFOI_LIBRARY__ || { url: 'https://lucide.dev/icons', name: 'Lucide' };
 
   // Initialize color state - check for last color synchronously to avoid flash
   // Use function initializer to check synchronously on each mount
@@ -688,7 +688,7 @@ export default function IconPicker({
   // Fetch current icon SVG if not in cache (after ensureSvg is defined)
   React.useEffect(() => {
     if (open && currentIconKey && !cache[currentIconKey] && restBase) {
-      const url = `${restBase}/acf-open-icons-lite/v1/icon?provider=${encodeURIComponent(
+      const url = `${restBase}/acf-open-icons/v1/icon?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}&key=${encodeURIComponent(currentIconKey)}`;
       fetch(url)
@@ -752,7 +752,7 @@ export default function IconPicker({
     let mounted = true;
     setManifestLoading(true);
     async function load() {
-      const url = `${restBase}/acf-open-icons-lite/v1/manifest?provider=${encodeURIComponent(
+      const url = `${restBase}/acf-open-icons/v1/manifest?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}`;
       const res = await fetch(url);
@@ -780,7 +780,7 @@ export default function IconPicker({
     if (!open || all.length === 0) return;
     const keysToEagerLoad = all.slice(0, 24).filter((k) => !cache[k]);
     if (keysToEagerLoad.length === 0) return;
-    const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
+    const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
       provider
     )}&version=${encodeURIComponent(version)}&keys=${keysToEagerLoad.join(',')}`;
       fetch(url)
@@ -803,7 +803,7 @@ export default function IconPicker({
     if (!open || recent.length === 0) return;
     const missing = recent.filter((k) => !cache[k]);
     if (missing.length === 0) return;
-    const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
+    const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
       provider
     )}&version=${encodeURIComponent(version)}&keys=${missing.join(',')}`;
     fetch(url)
@@ -829,7 +829,7 @@ export default function IconPicker({
       if (all.length === 0) return;
       const keys = all.slice(0, 24).filter((k) => !cache[k]);
       if (!keys.length) return;
-      const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
+      const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}&keys=${keys.join(',')}`;
       fetch(url)
@@ -961,7 +961,7 @@ export default function IconPicker({
 
     // Fetch all chunks in parallel
     const fetchPromises = chunks.map((chunk) => {
-      const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
+      const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}&keys=${chunk.join(',')}`;
       return fetch(url)
@@ -1025,7 +1025,7 @@ export default function IconPicker({
 
               Promise.all(
                 bgChunks.map((chunk) => {
-                  const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
+                  const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
                     provider
                   )}&version=${encodeURIComponent(version)}&keys=${chunk.join(
                     ','
@@ -1133,7 +1133,7 @@ export default function IconPicker({
 
   async function ensureSvg(key: string) {
     if (cache[key]) return cache[key];
-    const url = `${restBase}/acf-open-icons-lite/v1/icon?provider=${encodeURIComponent(
+    const url = `${restBase}/acf-open-icons/v1/icon?provider=${encodeURIComponent(
       provider
     )}&version=${encodeURIComponent(version)}&key=${encodeURIComponent(key)}`;
     const res = await fetch(url);
@@ -1586,20 +1586,34 @@ export default function IconPicker({
           )}
         </div>
 
-        <div className='border-t mt-4 pt-4 px-2 text-xs text-muted-foreground text-center'>
-          You are using <strong>{libraryInfo.name}</strong>.{' '}
-          <a
-            href={libraryInfo.url}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='text-blue-600 hover:underline'
-          >
-            View full icon set
-          </a>
-          .
+        <div className='border-t mt-4 pt-4 px-2 text-xs text-muted-foreground text-center space-y-2'>
+          <div>
+            You are using <strong>{libraryInfo.name}</strong>.{' '}
+            <a
+              href={libraryInfo.url}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-blue-600 hover:underline'
+            >
+              View full icon set
+            </a>
+            .
+          </div>
+          {(window as any).__ACFOI_LITE__ && (
+            <div className='text-emerald-600'>
+              Want 6,000+ more icons?{' '}
+              <a
+                href='https://acfopenicons.com?utm_source=plugin&utm_medium=picker&utm_campaign=lite'
+                target='_blank'
+                rel='noopener noreferrer'
+                className='font-medium hover:underline'
+              >
+                Upgrade to Premium →
+              </a>
+            </div>
+          )}
         </div>
       </div>
-    <p className="text-xs text-center text-gray-500 mt-3 pb-2">Want more icons? <a href="https://acfopenicons.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">Upgrade to Pro</a> for 15,000+ icons.</p>
     </DialogContent>
   );
 }

@@ -6,14 +6,20 @@ if (! defined('ABSPATH')) {
   exit;
 }
 
+/**
+ * Settings page for ACF Open Icons Lite.
+ * Simplified version with upsell messaging and tracking opt-in.
+ */
 class Settings {
-  private $option_key = 'acf_open_icons_lite_settings';
+  private $option_key = 'acf_open_icons_settings';
   private $providers;
   private $cache;
+  private $tracking;
 
-  public function __construct(Providers $providers, Cache $cache) {
+  public function __construct(Providers $providers, Cache $cache, ?Tracking $tracking = null) {
     $this->providers = $providers;
     $this->cache     = $cache;
+    $this->tracking  = $tracking;
     add_action('admin_menu', [$this, 'register_menu']);
     add_action('admin_init', [$this, 'register_settings']);
     add_action('admin_post_acfoil_purge_cache', [$this, 'handle_purge']);
@@ -37,11 +43,24 @@ class Settings {
     ]);
   }
 
+  /**
+   * Sanitise settings.
+   *
+   * @param mixed $value New settings value
+   * @return array Sanitised settings value
+   */
   public function sanitize_settings($value): array {
+    // Ensure value is an array
     $value = is_array($value) ? $value : [];
+
+    // Remove the nonce from the value if present
     if (isset($value['__nonce'])) {
       unset($value['__nonce']);
     }
+
+    // Force provider to heroicons (Lite only supports Heroicons)
+    $value['activeProvider'] = 'heroicons';
+
     return $value;
   }
 
@@ -56,7 +75,21 @@ class Settings {
       ],
       'defaultToken'   => 'A',
     ];
-    return wp_parse_args(get_option($this->option_key, []), $defaults);
+    $settings = wp_parse_args(get_option($this->option_key, []), $defaults);
+
+    // Force provider to heroicons for Lite version
+    $settings['activeProvider'] = 'heroicons';
+
+    return $settings;
+  }
+
+  /**
+   * Get current active provider (always heroicons for Lite).
+   *
+   * @return string Provider key
+   */
+  public function get_current_provider(): string {
+    return 'heroicons';
   }
 
   public function handle_purge(): void {
@@ -80,16 +113,34 @@ class Settings {
   }
 
   public function render_page(): void {
-    $settings = $this->get_settings();
+    $settings  = $this->get_settings();
+    $providers = $this->providers->all();
+    $premium_providers = $this->providers->get_premium_providers();
+    $tracking_status = $this->tracking ? $this->tracking->get_status() : ['enabled' => false];
 ?>
     <div class="wrap">
       <h1><?php echo esc_html__('Open Icons Settings', 'acf-open-icons-lite'); ?></h1>
 
+      <?php
+      // The React UI will mount here and replace the native form
+      // The form is needed for React to find and mount the UI
+      ?>
       <form method="post" action="options.php" style="margin-bottom:16px; display:none;">
         <?php settings_fields('acf_open_icons_lite'); ?>
         <input type="hidden" name="<?php echo esc_attr($this->option_key); ?>[__nonce]" value="<?php echo esc_attr(wp_create_nonce('acfoil_admin')); ?>" />
         <input type="hidden" name="<?php echo esc_attr($this->option_key); ?>[activeProvider]" value="heroicons" />
+
         <table class="form-table" role="presentation" style="display:none;">
+          <tr>
+            <th scope="row"><?php esc_html_e('Icon Set', 'acf-open-icons-lite'); ?></th>
+            <td>
+              <select name="<?php echo esc_attr($this->option_key); ?>[activeProvider]" disabled>
+                <?php foreach ($providers as $key => $meta) : ?>
+                  <option value="<?php echo esc_attr($key); ?>" <?php selected($settings['activeProvider'], $key); ?>><?php echo esc_html($meta['label']); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </td>
+          </tr>
           <tr>
             <th scope="row"><?php esc_html_e('Palette colours', 'acf-open-icons-lite'); ?></th>
             <td>
@@ -127,5 +178,14 @@ class Settings {
       </form>
     </div>
 <?php
+  }
+
+  /**
+   * Get tracking instance.
+   *
+   * @return Tracking|null
+   */
+  public function get_tracking(): ?Tracking {
+    return $this->tracking;
   }
 }

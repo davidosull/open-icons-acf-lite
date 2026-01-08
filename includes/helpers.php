@@ -9,7 +9,7 @@ if (! defined('ABSPATH')) {
  *
  * @param array|string $value   Required. ACF field value array (must contain 'svg' and optionally 'colorToken'), or legacy array with 'value' key.
  * @param array        $atts    Optional. Arguments to control icon display.
- *                              @type string $color Override color (hex code). If not provided and 'colorToken' exists, uses current settings.
+ *                              @type string $color Override colour (hex code). If not provided and 'colorToken' exists, uses current settings.
  *                              @type int    $size  Icon size in pixels. Default 24.
  *                              @type string $class CSS class name(s) to add to the SVG element. Default empty.
  *                              @type bool   $echo  Whether to echo or return. Default true.
@@ -40,12 +40,12 @@ function acf_open_icon($value = null, $atts = []) {
   // Handle both iconKey (camelCase) and iconkey (lowercase) from database
   $iconKey = ! empty($value['iconKey']) ? $value['iconKey'] : (! empty($value['iconkey']) ? $value['iconkey'] : '');
 
-  // If we have a stored SVG, use it (it should already have the correct color applied)
+  // If we have a stored SVG, use it (it should already have the correct colour applied)
   // This is the most reliable approach - use what's stored
   if (! empty($value['svg'])) {
     $svg = $value['svg'];
 
-    // Only apply color override if explicitly provided
+    // Only apply colour override if explicitly provided
     if (! empty($atts['color'])) {
 
       // Detect if icon uses fill or stroke (or both)
@@ -53,21 +53,21 @@ function acf_open_icon($value = null, $atts = []) {
       $has_stroke = preg_match('/\bstroke(?!-)\s*=/i', $svg);
       $has_fill = preg_match('/\bfill(?!-)\s*=/i', $svg) && !preg_match('/fill\s*=\s*["\']none["\']/i', $svg);
 
-      // Apply color to stroke if present
+      // Apply colour to stroke if present
       if ($has_stroke) {
         // Use negative lookahead to avoid matching stroke-width, stroke-linecap, etc.
         $svg = preg_replace('/\bstroke(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'stroke="' . esc_attr($atts['color']) . '"', $svg);
       }
 
-      // Apply color to fill if present and not explicitly set to "none"
+      // Apply colour to fill if present and not explicitly set to "none"
       if ($has_fill) {
         // Use negative lookahead to avoid matching fill-opacity, fill-rule, etc.
         $svg = preg_replace('/\bfill(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'fill="' . esc_attr($atts['color']) . '"', $svg);
       }
     }
-    // Otherwise, use stored SVG as-is (it should already have the correct color from colorToken)
+    // Otherwise, use stored SVG as-is (it should already have the correct colour from colorToken)
   } elseif (! empty($value['colorToken']) && ! empty($value['provider']) && ! empty($iconKey)) {
-    // Fallback: If no stored SVG but we have colorToken, fetch from cache and apply color
+    // Fallback: If no stored SVG but we have colorToken, fetch from cache and apply colour
     // This handles edge cases where SVG wasn't stored
     $providers = new \ACFOIL\Providers();
     $sanitiser = new \ACFOIL\Sanitiser();
@@ -77,13 +77,13 @@ function acf_open_icon($value = null, $atts = []) {
     $version  = sanitize_text_field($value['version'] ?? 'latest');
     $iconKey  = sanitize_title_with_dashes($iconKey);
 
-    // Fetch original SVG from cache (without color applied)
+    // Fetch original SVG from cache (without colour applied)
     $svg = $cache->get_svg($provider, $version, $iconKey);
 
     if ($svg) {
-      // Get current color from settings based on token (unless override provided)
+      // Get current colour from settings based on token (unless override provided)
       if (empty($atts['color'])) {
-        $settings = get_option('acf_open_icons_lite_settings', []);
+        $settings = get_option('acf_open_icons_settings', []);
         $palette  = $settings['palette'] ?? [];
         if (is_array($palette)) {
           foreach ($palette as $item) {
@@ -95,19 +95,19 @@ function acf_open_icon($value = null, $atts = []) {
         }
       }
 
-      // Apply color if we have one
+      // Apply colour if we have one
       if (! empty($atts['color'])) {
         // Detect if icon uses fill or stroke (or both)
         $has_stroke = preg_match('/\bstroke(?!-)\s*=/i', $svg);
         $has_fill = preg_match('/\bfill(?!-)\s*=/i', $svg) && !preg_match('/fill\s*=\s*["\']none["\']/i', $svg);
 
-        // Apply color to stroke if present
+        // Apply colour to stroke if present
         if ($has_stroke) {
           // Use negative lookahead to avoid matching stroke-width, stroke-linecap, etc.
           $svg = preg_replace('/\bstroke(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'stroke="' . esc_attr($atts['color']) . '"', $svg);
         }
 
-        // Apply color to fill if present and not explicitly set to "none"
+        // Apply colour to fill if present and not explicitly set to "none"
         if ($has_fill) {
           // Use negative lookahead to avoid matching fill-opacity, fill-rule, etc.
           $svg = preg_replace('/\bfill(?!-)\s*=\s*["\']?[^"\'\s>]*["\']?/i', 'fill="' . esc_attr($atts['color']) . '"', $svg);
@@ -142,11 +142,11 @@ function acf_open_icon($value = null, $atts = []) {
     // Prepare class attribute
     $class_attr = '';
     if (! empty($atts['class'])) {
-      // Split by spaces and sanitize each class individually
+      // Split by spaces and sanitise each class individually
       $class_parts = explode(' ', trim($atts['class']));
-      $sanitized_classes = array_filter(array_map('sanitize_html_class', $class_parts));
-      if (! empty($sanitized_classes)) {
-        $class_attr = ' class="' . esc_attr(implode(' ', $sanitized_classes)) . '"';
+      $sanitised_classes = array_filter(array_map('sanitize_html_class', $class_parts));
+      if (! empty($sanitised_classes)) {
+        $class_attr = ' class="' . esc_attr(implode(' ', $sanitised_classes)) . '"';
       }
     }
 
@@ -181,9 +181,9 @@ function acf_open_icon($value = null, $atts = []) {
     $class_attr = '';
     if (! empty($atts['class'])) {
       $class_parts = explode(' ', trim($atts['class']));
-      $sanitized_classes = array_filter(array_map('sanitize_html_class', $class_parts));
-      if (! empty($sanitized_classes)) {
-        $class_attr = ' class="' . esc_attr(implode(' ', $sanitized_classes)) . '"';
+      $sanitised_classes = array_filter(array_map('sanitize_html_class', $class_parts));
+      if (! empty($sanitised_classes)) {
+        $class_attr = ' class="' . esc_attr(implode(' ', $sanitised_classes)) . '"';
       }
     }
     $svg = preg_replace('/<svg\s*>/i', '<svg width="' . $size . '" height="' . $size . '"' . $class_attr . '>', $svg);
@@ -193,12 +193,5 @@ function acf_open_icon($value = null, $atts = []) {
     echo $svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
   } else {
     return $svg;
-  }
-}
-
-// Backwards compatibility
-if (! function_exists('bic_icon')) {
-  function bic_icon($value = null, $atts = []) {
-    return acf_open_icon($value, $atts);
   }
 }

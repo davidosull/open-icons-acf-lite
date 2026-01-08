@@ -6,10 +6,14 @@ if (! defined('ABSPATH')) {
   exit;
 }
 
+/**
+ * REST API endpoints for ACF Open Icons Lite.
+ * Simplified version without migration or license endpoints.
+ */
 class Rest {
   private $providers;
   private $cache;
-  private $ns = 'acf-open-icons-lite/v1';
+  private $ns = 'acf-open-icons/v1';
 
   public function __construct(Providers $providers, Cache $cache) {
     $this->providers = $providers;
@@ -43,12 +47,34 @@ class Rest {
         return current_user_can('manage_options') && check_ajax_referer('acfoil_admin', false, false);
       },
     ]);
+
+    // Tracking endpoint
+    register_rest_route($this->ns, '/tracking', [
+      'methods'  => 'GET',
+      'callback' => [$this, 'get_tracking_status'],
+      'permission_callback' => function () {
+        return current_user_can('manage_options');
+      },
+    ]);
+
+    register_rest_route($this->ns, '/tracking/toggle', [
+      'methods'  => 'POST',
+      'callback' => [$this, 'toggle_tracking'],
+      'permission_callback' => function () {
+        return current_user_can('manage_options');
+      },
+    ]);
   }
 
   public function get_icon(\WP_REST_Request $req) {
     $provider = sanitize_key((string) $req->get_param('provider'));
     $version  = sanitize_text_field((string) $req->get_param('version'));
     $key      = $this->sanitize_icon_key((string) $req->get_param('key'));
+
+    // Lite version only supports heroicons
+    if ($provider !== 'heroicons') {
+      $provider = 'heroicons';
+    }
 
     if (! $this->providers->get($provider) || empty($key)) {
       return new \WP_Error('acfoil_bad_request', __('Invalid provider or key.', 'acf-open-icons-lite'), ['status' => 400]);
@@ -69,13 +95,19 @@ class Rest {
   private function sanitize_icon_key(string $key): string {
     $key = str_replace(["\0", "\r", "\n"], '', $key);
     $key = str_replace(['..', '/', '\\'], '', $key);
-    return trim($key);
+    $key = trim($key);
+    return $key;
   }
 
   public function get_manifest(\WP_REST_Request $req) {
     $provider = sanitize_key((string) $req->get_param('provider'));
     $version  = sanitize_text_field((string) $req->get_param('version')) ?: 'latest';
     $search   = sanitize_text_field((string) $req->get_param('q'));
+
+    // Lite version only supports heroicons
+    if ($provider !== 'heroicons') {
+      $provider = 'heroicons';
+    }
 
     $cache_key = 'acfoil_manifest_' . md5($provider . '|' . $version);
     $icons = get_transient($cache_key);
@@ -99,6 +131,7 @@ class Rest {
   public function fetch_manifest(string $provider, string $version): array {
     $icons = [];
 
+    // Lite version only supports heroicons
     if ($provider === 'heroicons') {
       $meta_url = 'https://unpkg.com/heroicons@' . rawurlencode($version) . '/?meta';
       $response = wp_remote_get($meta_url, ['timeout' => 20]);
@@ -125,9 +158,14 @@ class Rest {
     $keys     = (string) $req->get_param('keys');
     $keys_arr = array_filter(array_map([$this, 'sanitize_icon_key'], explode(',', $keys)));
 
-    $out = [];
-    $cache_misses = [];
+    // Lite version only supports heroicons
+    if ($provider !== 'heroicons') {
+      $provider = 'heroicons';
+    }
 
+    $out = [];
+
+    // First, check cache for all icons
     foreach ($keys_arr as $k) {
       $file = $this->cache->path_for($provider, $version, $k);
       if (file_exists($file)) {
@@ -140,14 +178,11 @@ class Rest {
           $out[] = ['key' => $k, 'svg' => $svg];
         }
       } else {
-        $cache_misses[] = $k;
-      }
-    }
-
-    if (! empty($cache_misses)) {
-      $fetched = $this->cache->fetch_multiple_and_store($provider, $version, $cache_misses);
-      foreach ($fetched as $k => $svg) {
-        $out[] = ['key' => $k, 'svg' => $svg];
+        // Fetch missing icons
+        $fetched = $this->cache->fetch_and_store($provider, $version, $k);
+        if ($fetched) {
+          $out[] = ['key' => $k, 'svg' => $fetched];
+        }
       }
     }
 
@@ -157,10 +192,43 @@ class Rest {
   public function purge_cache(\WP_REST_Request $req) {
     $provider = sanitize_key((string) $req->get_param('provider'));
     $version  = sanitize_text_field((string) $req->get_param('version'));
-    if (! $this->providers->get($provider) || ! $version) {
-      return new \WP_Error('acfoil_bad_request', __('Invalid provider or version.', 'acf-open-icons-lite'), ['status' => 400]);
+
+    if ($provider !== 'heroicons') {
+      $provider = 'heroicons';
     }
+
+    if (! $version) {
+      return new \WP_Error('acfoil_bad_request', __('Invalid version.', 'acf-open-icons-lite'), ['status' => 400]);
+    }
+
     $this->cache->purge($provider, $version);
     return ['ok' => true];
+  }
+
+  /**
+   * Get tracking status.
+   */
+  public function get_tracking_status(\WP_REST_Request $req) {
+    $tracking = new Tracking();
+    return $tracking->get_status();
+  }
+
+  /**
+   * Toggle tracking on/off.
+   */
+  public function toggle_tracking(\WP_REST_Request $req) {
+    $enable = (bool) $req->get_param('enable');
+    $tracking = new Tracking();
+
+    if ($enable) {
+      $tracking->enable();
+    } else {
+      $tracking->disable();
+    }
+
+    return [
+      'success' => true,
+      'enabled' => $tracking->is_enabled(),
+    ];
   }
 }

@@ -6,6 +6,9 @@ if (! defined('ABSPATH')) {
   exit;
 }
 
+/**
+ * SVG sanitiser for ACF Open Icons Lite.
+ */
 class Sanitiser {
   private $allowed_tags = ['svg', 'path', 'g', 'defs', 'use', 'clipPath', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse'];
   private $allowed_attrs = ['xmlns', 'viewBox', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd', 'x', 'y', 'cx', 'cy', 'r', 'x1', 'x2', 'y1', 'y2', 'points'];
@@ -46,7 +49,7 @@ class Sanitiser {
         $node->parentNode && $node->parentNode->removeChild($node);
         return;
       }
-      // Remove common background box path used by some sets (e.g., Tabler)
+      // Remove common background box path used by some sets
       if ($tag === 'path' && $node->attributes && $node->attributes->getNamedItem('d')) {
         $d = trim($node->attributes->getNamedItem('d')->nodeValue);
         // Matches the invisible 24x24 box path: M0 0h24v24H0z (allow minor spacing variations)

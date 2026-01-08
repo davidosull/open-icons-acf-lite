@@ -58,7 +58,7 @@ export function useToaster(inlineHost?: HTMLElement | null) {
             'acfoi-toast',
             isInline ? 'w-full' : 'w-[300px] pointer-events-auto',
             'rounded-md border p-4',
-            t.type === 'success' && 'bg-green-50 border-green-200 text-green-800',
+            t.type === 'success' && 'bg-emerald-50 border-emerald-200 text-emerald-800',
             t.type === 'error' && 'bg-red-50 border-red-200 text-red-800',
             (!t.type || t.type === 'info') && 'bg-blue-50 border-blue-200 text-blue-800'
           )}

@@ -1,28 +1,20 @@
-# Dev mode toggle
-.dev
-
 # Dependencies
-/node_modules/
-/frontend/node_modules/
+node_modules/
 
 # Build artifacts
-/assets/build/
+builds/
 
-# Editor files
-.vscode/
-.idea/
-
-# OS files
+# Development
+.dev
 .DS_Store
 Thumbs.db
 
+# IDE
+.vscode/
+.idea/
+
 # Logs
 *.log
-npm-debug.log*
 
-# Context folder (local reference only)
-/assets/
-/builds/
-
-
-
+# Local guides (not needed in repo)
+WP-SUBMISSION-GUIDE.md

@@ -4,7 +4,7 @@ module.exports = {
     './src/**/*.{ts,tsx,js,jsx}',
     '!./src/**/node_modules/**/*',
     './includes/**/*.php',
-    './acf-open-icons.php',
+    './acf-open-icons-lite.php',
   ],
   theme: {
     extend: {},
