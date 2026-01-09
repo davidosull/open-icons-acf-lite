@@ -1,8 +1,8 @@
 === ACF Open Icons Lite ===
-Contributors: osullivanio
+Contributors: davidosullio
 Tags: acf, icons, svg, heroicons, custom fields
 Requires at least: 5.8
-Tested up to: 6.4
+Tested up to: 6.9
 Requires PHP: 7.4
 Stable tag: 1.0.0
 License: GPLv2 or later
@@ -12,12 +12,12 @@ A beautiful icon picker field for Advanced Custom Fields using Heroicons. Pick f
 
 == Description ==
 
-ACF Open Icons Lite adds a custom field type to Advanced Custom Fields (ACF) that lets you select and display beautiful SVG icons from the Heroicons library.
+ACF Open Icons Lite adds a custom field type to Advanced Custom Fields (ACF) that lets you select and display SVG icons from the Heroicons library.
 
 **Features:**
 
 * **292 Heroicons** - Beautiful, hand-crafted SVG icons by the makers of Tailwind CSS
-* **Colour palette** - Define up to 3 colour tokens and apply them to icons
+* **color palette** - Define up to 3 color tokens and apply them to icons
 * **Smart caching** - Icons are cached locally for optimal performance
 * **Clean output** - Simple `acf_open_icon()` helper function for displaying icons
 * **Sanitised SVGs** - All icons are sanitised for security
@@ -25,7 +25,7 @@ ACF Open Icons Lite adds a custom field type to Advanced Custom Fields (ACF) tha
 **How it works:**
 
 1. Add an "Open Icons" field to your ACF field group
-2. Select an icon and colour from the beautiful picker interface
+2. Select an icon and color from the beautiful picker interface
 3. Display the icon in your theme using the `acf_open_icon()` function
 
 **Display icons in your theme:**
@@ -76,7 +76,7 @@ $icon = get_field('icon');
 acf_open_icon($icon, ['size' => 24, 'class' => 'my-icon']);
 `
 
-= Can I change the icon colour dynamically? =
+= Can I change the icon color dynamically? =
 
 Yes! Pass a `color` parameter:
 
@@ -90,16 +90,11 @@ The Lite version includes the full Heroicons library (292 icons). For access to 
 
 == Screenshots ==
 
-1. The icon picker modal with search and colour selection
+1. The icon picker modal with search and color selection
 2. Icon field in the WordPress editor
-3. Settings page with colour palette configuration
+3. Settings page with color palette configuration
 
 == Changelog ==
-
-= 1.0.0 =
-* Initial release
-
-== Upgrade Notice ==
 
 = 1.0.0 =
 Initial release of ACF Open Icons Lite.

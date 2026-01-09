@@ -88,7 +88,7 @@ class Rest {
     status_header(200);
     header('Content-Type: image/svg+xml; charset=UTF-8');
     header('Cache-Control: public, max-age=31536000');
-    echo $svg;
+    echo wp_kses($svg, acfoil_get_allowed_svg_tags());
     exit;
   }
 

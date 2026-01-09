@@ -5,6 +5,106 @@ if (! defined('ABSPATH')) {
 }
 
 /**
+ * Get allowed SVG tags and attributes for wp_kses.
+ *
+ * @return array Allowed tags and attributes.
+ */
+function acfoil_get_allowed_svg_tags() {
+  return [
+    'svg' => [
+      'xmlns'       => true,
+      'viewbox'     => true,
+      'width'       => true,
+      'height'      => true,
+      'fill'        => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+      'stroke-linecap' => true,
+      'stroke-linejoin' => true,
+      'class'       => true,
+      'aria-hidden' => true,
+      'role'        => true,
+      'focusable'   => true,
+    ],
+    'path' => [
+      'd'           => true,
+      'fill'        => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+      'stroke-linecap' => true,
+      'stroke-linejoin' => true,
+      'fill-rule'   => true,
+      'clip-rule'   => true,
+    ],
+    'circle' => [
+      'cx'          => true,
+      'cy'          => true,
+      'r'           => true,
+      'fill'        => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+    ],
+    'rect' => [
+      'x'           => true,
+      'y'           => true,
+      'width'       => true,
+      'height'      => true,
+      'rx'          => true,
+      'ry'          => true,
+      'fill'        => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+    ],
+    'line' => [
+      'x1'          => true,
+      'y1'          => true,
+      'x2'          => true,
+      'y2'          => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+      'stroke-linecap' => true,
+    ],
+    'polyline' => [
+      'points'      => true,
+      'fill'        => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+      'stroke-linecap' => true,
+      'stroke-linejoin' => true,
+    ],
+    'polygon' => [
+      'points'      => true,
+      'fill'        => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+    ],
+    'ellipse' => [
+      'cx'          => true,
+      'cy'          => true,
+      'rx'          => true,
+      'ry'          => true,
+      'fill'        => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+    ],
+    'g' => [
+      'fill'        => true,
+      'stroke'      => true,
+      'stroke-width' => true,
+      'transform'   => true,
+    ],
+    'defs' => [],
+    'clippath' => [
+      'id'          => true,
+    ],
+    'use' => [
+      'href'        => true,
+      'xlink:href'  => true,
+    ],
+  ];
+}
+
+/**
  * Display an icon from ACF Open Icons field.
  *
  * @param array|string $value   Required. ACF field value array (must contain 'svg' and optionally 'colorToken'), or legacy array with 'value' key.
@@ -15,7 +115,7 @@ if (! defined('ABSPATH')) {
  *                              @type bool   $echo  Whether to echo or return. Default true.
  * @return string|void SVG markup if $echo is false, otherwise echoes.
  */
-function acf_open_icon($value = null, $atts = []) {
+function acfoil_open_icon($value = null, $atts = []) {
   // Backwards compatibility: detect if first param is an array with 'value' key
   if (is_array($value) && isset($value['value']) && ! isset($value['svg']) && ! isset($value['iconKey'])) {
     // Old API: acf_open_icon(['value' => $icon_field, 'size' => 32])
@@ -189,9 +289,27 @@ function acf_open_icon($value = null, $atts = []) {
     $svg = preg_replace('/<svg\s*>/i', '<svg width="' . $size . '" height="' . $size . '"' . $class_attr . '>', $svg);
   }
 
+  // Sanitize SVG for safe output using wp_kses with allowed SVG tags
+  $svg = wp_kses($svg, acfoil_get_allowed_svg_tags());
+
   if ($atts['echo']) {
-    echo $svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+    // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Output is sanitized by wp_kses above
+    echo $svg;
   } else {
     return $svg;
   }
+}
+
+/**
+ * Backward-compatible alias for acfoil_open_icon.
+ *
+ * @deprecated Use acfoil_open_icon() instead.
+ * @see acfoil_open_icon()
+ *
+ * @param array|string $value ACF field value.
+ * @param array        $atts  Display arguments.
+ * @return string|void
+ */
+function acf_open_icon($value = null, $atts = []) {
+  return acfoil_open_icon($value, $atts);
 }

@@ -139,22 +139,22 @@ class ACF_Field_Open_Icons extends \acf_field {
     $field_key = esc_attr($field['key'] ?? '');
 ?>
     <div class="acfoi-field" id="<?php echo esc_attr($instance_id); ?>"
-      data-acfoi-provider="<?php echo $pickerProv; ?>"
-      data-acfoi-version="<?php echo $pickerVer; ?>"
+      data-acfoi-provider="<?php echo esc_attr($pickerProv); ?>"
+      data-acfoi-version="<?php echo esc_attr($pickerVer); ?>"
       data-acfoi-instance-id="<?php echo esc_attr($instance_id); ?>"
-      data-acfoi-use-last-color="<?php echo $use_last_color; ?>"
-      data-acfoi-field-key="<?php echo $field_key; ?>"
+      data-acfoi-use-last-color="<?php echo esc_attr($use_last_color); ?>"
+      data-acfoi-field-key="<?php echo esc_attr($field_key); ?>"
       data-acfoi-field-group-key="<?php echo esc_attr($field_group_key); ?>"
       data-acfoi-picker-blocked="0">
-      <input type="hidden" name="<?php echo $field_name; ?>[provider]" value="<?php echo $refProv; ?>" data-acfoi-provider-out />
-      <input type="hidden" name="<?php echo $field_name; ?>[version]" value="<?php echo $refVer; ?>" data-acfoi-version-out />
-      <input type="hidden" name="<?php echo $field_name; ?>[iconKey]" value="<?php echo $refKey; ?>" data-acfoi-key-out />
-      <input type="hidden" name="<?php echo $field_name; ?>[colorToken]" value="<?php echo esc_attr($value['colorToken'] ?? ''); ?>" data-acfoi-color-token-out />
-      <textarea class="acf-hidden" name="<?php echo $field_name; ?>[svg]" data-acfoi-svg-out><?php echo esc_textarea($stored); ?></textarea>
+      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[provider]" value="<?php echo esc_attr($refProv); ?>" data-acfoi-provider-out />
+      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[version]" value="<?php echo esc_attr($refVer); ?>" data-acfoi-version-out />
+      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[iconKey]" value="<?php echo esc_attr($refKey); ?>" data-acfoi-key-out />
+      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[colorToken]" value="<?php echo esc_attr($value['colorToken'] ?? ''); ?>" data-acfoi-color-token-out />
+      <textarea class="acf-hidden" name="<?php echo esc_attr($field_name); ?>[svg]" data-acfoi-svg-out><?php echo esc_textarea($stored); ?></textarea>
 
       <div class="acfoi-preview-wrap" style="display:flex;align-items:center;gap:12px;">
         <div class="acfoi-preview" style="width:40px;height:40px;border:1px solid #ddd;border-radius:4px;display:flex;align-items:center;justify-content:center;background:#fff;line-height:0;<?php echo $has_icon ? '' : 'display:none;'; ?>" title="<?php esc_attr_e('Click to change icon', 'acf-open-icons-lite'); ?>" data-acfoi-preview>
-          <?php echo $has_icon ? $stored : ''; ?>
+          <?php echo $has_icon ? wp_kses($stored, acfoil_get_allowed_svg_tags()) : ''; ?>
         </div>
         <div class="acfoi-actions" style="display:flex;gap:8px;">
           <button class="button button-primary acfoi-select-button" type="button" data-acfoi-open><?php echo $has_icon ? esc_html__('Change Icon', 'acf-open-icons-lite') : esc_html__('Select Icon', 'acf-open-icons-lite'); ?></button>

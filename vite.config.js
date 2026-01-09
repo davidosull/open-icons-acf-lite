@@ -56,7 +56,7 @@ export default defineConfig({
   build: {
     outDir: 'assets/build',
     emptyOutDir: true,
-    manifest: '.vite/manifest.json',
+    manifest: 'manifest.json',
     assetsDir: '',
     sourcemap: false,
     minify: 'esbuild',

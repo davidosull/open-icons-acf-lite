@@ -53,6 +53,18 @@ const excludePatterns = [
   '.dev',
   '.vscode',
   '.idea',
+  'docs',
+];
+
+// Files to always exclude (applied to all builds including production)
+// Note: Hidden files (starting with .) are automatically excluded by shouldExclude()
+const alwaysExclude = [
+  '.DS_Store',
+  '.gitignore',
+  '.git',
+  '.dev',
+  'Thumbs.db',
+  'docs',
 ];
 
 // Production files for WordPress.org submission
@@ -67,12 +79,25 @@ const productionFiles = [
 // Helper function to check if a path should be excluded
 function shouldExclude(filePath, patterns) {
   const normalizedPath = filePath.replace(/\\/g, '/');
+  const parts = normalizedPath.split('/');
+  const fileName = parts[parts.length - 1];
+
+  // Exclude all hidden files/folders (starting with .)
+  // WordPress.org does not permit hidden files or folders
+  if (fileName.startsWith('.')) {
+    return true;
+  }
+
+  // Always exclude files in the alwaysExclude list
+  if (alwaysExclude.some(exc => parts.some(part => part === exc))) {
+    return true;
+  }
+
   return patterns.some(pattern => {
     if (pattern.includes('*')) {
       const regex = new RegExp(pattern.replace(/\*/g, '.*'));
       return regex.test(normalizedPath);
     }
-    const parts = normalizedPath.split('/');
     return parts.some(part => part === pattern || part.endsWith(pattern));
   });
 }
@@ -96,7 +121,7 @@ function copyRecursive(src, dest, includeList = null, excludeList = []) {
       const destPath = join(dest, entry);
       const relativePath = relative(rootDir, srcPath).replace(/\\/g, '/');
 
-      // Check if should be excluded
+      // Always check exclusions (includes hidden files and alwaysExclude list)
       if (shouldExclude(relativePath, excludeList)) {
         continue;
       }
@@ -119,7 +144,7 @@ function copyRecursive(src, dest, includeList = null, excludeList = []) {
   } else {
     const relativePath = relative(rootDir, src).replace(/\\/g, '/');
 
-    // Check if should be excluded
+    // Always check exclusions (includes hidden files and alwaysExclude list)
     if (shouldExclude(relativePath, excludeList)) {
       return;
     }

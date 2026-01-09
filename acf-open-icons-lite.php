@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Plugin Name: ACF Open Icons Lite
+ * Plugin Name: Advanced Custom Fields: Open Icons Lite
  * Description: ACF field that lets you use the Heroicons icon set with caching, sanitisation, and stable rendering. Free version with 292+ icons.
  * Version: 1.0.0
  * Author: David O'Sullivan
@@ -71,8 +71,8 @@ add_action('plugins_loaded', function () {
     return;
   }
 
-  // Load text domain
-  load_plugin_textdomain('acf-open-icons-lite', false, dirname(plugin_basename(__FILE__)) . '/languages');
+  // Note: load_plugin_textdomain() is not needed for plugins hosted on WordPress.org
+  // since WP 4.6+ automatically loads translations from translate.wordpress.org
 
   // Define constants
   define('ACFOIL_PLUGIN_FILE', __FILE__);

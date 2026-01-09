@@ -71,7 +71,7 @@ class Settings {
       'palette'        => [
         ['token' => 'A', 'label' => 'Primary', 'hex' => '#18181b'],
         ['token' => 'B', 'label' => 'Secondary', 'hex' => '#71717a'],
-        ['token' => 'C', 'label' => 'Accent', 'hex' => '#34d399'],
+        ['token' => 'C', 'label' => 'Accent', 'hex' => '#4f46e5'],
       ],
       'defaultToken'   => 'A',
     ];

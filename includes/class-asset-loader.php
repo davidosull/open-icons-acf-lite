@@ -59,9 +59,16 @@ class Asset_Loader {
     }
 
     foreach ($hosts as $host) {
-      $conn = @fsockopen($host, $port, $errno, $errstr, $timeout);
-      if (is_resource($conn)) {
-        fclose($conn);
+      // Use wp_remote_get with a very short timeout to check if server is reachable
+      $url = sprintf('%s://%s:%d/', $config['scheme'], $host, $port);
+      $response = wp_remote_get($url, [
+        'timeout' => $timeout,
+        'redirection' => 0,
+        'sslverify' => false,
+      ]);
+
+      // If we get any response (even an error page), the server is running
+      if (! is_wp_error($response)) {
         return $host;
       }
     }
@@ -202,7 +209,7 @@ class Asset_Loader {
   private static function enqueue_vite_client_with_preamble(): void {
     $vite_url = self::get_vite_server_url();
 
-    wp_register_script('acfoil-vite-client', $vite_url . '/@vite/client', [], null, false);
+    wp_register_script('acfoil-vite-client', $vite_url . '/@vite/client', [], (string) time(), false);
     self::ensure_module_script_filter();
 
     $preamble_tpl = <<<'JS'
@@ -243,7 +250,7 @@ JS;
         echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true;</script>' . "\n";
       }, 5);
     } else {
-      $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
+      $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/manifest.json';
       $manifest = [];
 
       if (! file_exists($manifest_path)) {
@@ -318,7 +325,7 @@ JS;
         echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true;</script>' . "\n";
       }, 5);
     } else {
-      $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/.vite/manifest.json';
+      $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/manifest.json';
       $manifest = [];
 
       if (! file_exists($manifest_path)) {

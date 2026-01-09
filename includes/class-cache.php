@@ -69,8 +69,13 @@ class Cache {
   }
 
   /**
-   * Fetch multiple icons in parallel using curl_multi_exec
-   * Returns array of [key => svg] for successfully fetched icons
+   * Fetch multiple icons and store them.
+   * Returns array of [key => svg] for successfully fetched icons.
+   *
+   * @param string $provider Provider name.
+   * @param string $version  Provider version.
+   * @param array  $keys     Icon keys to fetch.
+   * @return array Fetched SVGs keyed by icon key.
    */
   public function fetch_multiple_and_store(string $provider, string $version, array $keys): array {
     $meta = $this->providers->get($provider);
@@ -91,68 +96,54 @@ class Cache {
       return [];
     }
 
-    // Build URLs for all icons
-    $urls = [];
-    foreach ($to_fetch as $key) {
-      $urls[$key] = $this->build_cdn_url($meta, $version, $key);
-    }
-
-    // Use curl_multi for parallel requests
-    $multi_handle = curl_multi_init();
-    $curl_handles = [];
     $results = [];
 
-    // Create curl handles for each URL
-    foreach ($urls as $key => $url) {
-      $ch = curl_init($url);
-      curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 15,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_USERAGENT => 'WordPress/' . get_bloginfo('version') . '; ' . home_url(),
+    // Fetch each icon using WordPress HTTP API
+    foreach ($to_fetch as $key) {
+      $url = $this->build_cdn_url($meta, $version, $key);
+      $response = wp_remote_get($url, [
+        'timeout' => 15,
       ]);
-      curl_multi_add_handle($multi_handle, $ch);
-      $curl_handles[$key] = $ch;
-    }
 
-    // Execute all requests in parallel
-    $running = null;
-    do {
-      $status = curl_multi_exec($multi_handle, $running);
-      if ($running > 0) {
-        curl_multi_select($multi_handle, 0.1);
-      }
-    } while ($running > 0 && $status === CURLM_OK);
-
-    // Process results
-    foreach ($curl_handles as $key => $ch) {
-      $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-      $body = curl_multi_getcontent($ch);
-      $error = curl_error($ch);
-
-      if ($error) {
-        curl_multi_remove_handle($multi_handle, $ch);
-        curl_close($ch);
+      if (is_wp_error($response)) {
         continue;
       }
 
-      if ($http_code === 200 && ! empty($body)) {
+      $code = wp_remote_retrieve_response_code($response);
+      $body = wp_remote_retrieve_body($response);
+
+      if ($code === 200 && ! empty($body)) {
         $sanitised = $this->sanitiser->sanitise($body);
         $sanitised = str_replace('\\"', '"', $sanitised);
         $file = $this->path_for($provider, $version, $key);
-        file_put_contents($file, $sanitised);
+        $this->write_file($file, $sanitised);
         $results[$key] = $sanitised;
       }
-
-      curl_multi_remove_handle($multi_handle, $ch);
-      curl_close($ch);
     }
 
-    curl_multi_close($multi_handle);
-
     return $results;
+  }
+
+  /**
+   * Write content to a file using WP_Filesystem.
+   *
+   * @param string $file    File path.
+   * @param string $content Content to write.
+   * @return bool True on success.
+   */
+  private function write_file(string $file, string $content): bool {
+    global $wp_filesystem;
+
+    if (! function_exists('WP_Filesystem')) {
+      require_once ABSPATH . 'wp-admin/includes/file.php';
+    }
+
+    if (! WP_Filesystem()) {
+      // Fallback to direct file write if WP_Filesystem fails
+      return (bool) file_put_contents($file, $content);
+    }
+
+    return $wp_filesystem->put_contents($file, $content, FS_CHMOD_FILE);
   }
 
   private function build_cdn_url(array $meta, string $version, string $key): string {
@@ -185,12 +176,14 @@ class Cache {
       if (is_dir($path)) {
         $this->rrmdir(trailingslashit($path));
       } else {
-        @unlink($path);
+        wp_delete_file($path);
       }
     }
   }
 
   private function rrmdir(string $dir): void {
+    global $wp_filesystem;
+
     $items = @scandir($dir);
     if (! $items) {
       return;
@@ -201,13 +194,24 @@ class Cache {
       if (is_dir($path)) {
         $this->rrmdir(trailingslashit($path));
       } else {
-        @unlink($path);
+        wp_delete_file($path);
       }
     }
-    @rmdir($dir);
+
+    // Use WP_Filesystem for rmdir
+    if (! function_exists('WP_Filesystem')) {
+      require_once ABSPATH . 'wp-admin/includes/file.php';
+    }
+    if (WP_Filesystem()) {
+      $wp_filesystem->rmdir($dir);
+    } else {
+      @rmdir($dir); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+    }
   }
 
   public static function purge_all_directory(string $base_dir): void {
+    global $wp_filesystem;
+
     if (! is_dir($base_dir)) {
       return;
     }
@@ -221,9 +225,18 @@ class Cache {
       if (is_dir($path)) {
         self::purge_all_directory(trailingslashit($path));
       } else {
-        @unlink($path);
+        wp_delete_file($path);
       }
     }
-    @rmdir($base_dir);
+
+    // Use WP_Filesystem for rmdir
+    if (! function_exists('WP_Filesystem')) {
+      require_once ABSPATH . 'wp-admin/includes/file.php';
+    }
+    if (WP_Filesystem()) {
+      $wp_filesystem->rmdir($base_dir);
+    } else {
+      @rmdir($base_dir); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+    }
   }
 }

@@ -150,7 +150,7 @@ class Tracking {
       return;
     }
 
-    if (! wp_verify_nonce($_GET['_wpnonce'] ?? '', 'acfoil_tracking_action')) {
+    if (! isset($_GET['_wpnonce']) || ! wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'acfoil_tracking_action')) {
       return;
     }
 
