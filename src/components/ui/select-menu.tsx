@@ -1,7 +1,14 @@
 import * as React from 'react';
 import { cn } from '../../lib/utils';
+import { Badge } from './badge';
 
-export type SelectItem = { value: string; label?: string; hex?: string };
+export type SelectItem = {
+  value: string;
+  label?: string;
+  hex?: string;
+  disabled?: boolean;
+  badge?: string;
+};
 
 export function SelectMenu({
   value,
@@ -61,13 +68,19 @@ export function SelectMenu({
             <button
               key={it.value}
               type='button'
+              disabled={it.disabled}
               className={cn(
-                'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-zinc-50',
-                it.value === value && 'bg-zinc-50'
+                'flex w-full items-center justify-start gap-2 rounded px-2 py-1 text-left text-sm',
+                it.disabled
+                  ? 'cursor-not-allowed text-zinc-400'
+                  : 'hover:bg-zinc-50',
+                it.value === value && !it.disabled && 'bg-zinc-50'
               )}
               onClick={() => {
-                onChange(it.value);
-                setOpen(false);
+                if (!it.disabled) {
+                  onChange(it.value);
+                  setOpen(false);
+                }
               }}
             >
               {it.hex && (
@@ -77,6 +90,11 @@ export function SelectMenu({
                 />
               )}
               {it.label ?? it.value}
+              {it.badge && (
+                <Badge variant='info' className='text-[10px] px-1.5 py-0'>
+                  {it.badge}
+                </Badge>
+              )}
             </button>
           ))}
         </div>

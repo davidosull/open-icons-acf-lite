@@ -44,7 +44,7 @@ class Rest {
       'methods'  => 'POST',
       'callback' => [$this, 'purge_cache'],
       'permission_callback' => function () {
-        return current_user_can('manage_options') && check_ajax_referer('acfoil_admin', false, false);
+        return current_user_can('manage_options');
       },
     ]);
 
@@ -60,6 +60,22 @@ class Rest {
     register_rest_route($this->ns, '/tracking/toggle', [
       'methods'  => 'POST',
       'callback' => [$this, 'toggle_tracking'],
+      'permission_callback' => function () {
+        return current_user_can('manage_options');
+      },
+    ]);
+
+    register_rest_route($this->ns, '/settings', [
+      'methods'  => 'POST',
+      'callback' => [$this, 'save_settings'],
+      'permission_callback' => function () {
+        return current_user_can('manage_options');
+      },
+    ]);
+
+    register_rest_route($this->ns, '/settings/restore', [
+      'methods'  => 'POST',
+      'callback' => [$this, 'restore_defaults'],
       'permission_callback' => function () {
         return current_user_can('manage_options');
       },
@@ -229,6 +245,72 @@ class Rest {
     return [
       'success' => true,
       'enabled' => $tracking->is_enabled(),
+    ];
+  }
+
+  /**
+   * Save settings via REST.
+   */
+  public function save_settings(\WP_REST_Request $req) {
+    $settings = $req->get_json_params();
+
+    if (! is_array($settings)) {
+      return new \WP_Error('acfoil_bad_request', __('Invalid settings data.', 'acf-open-icons-lite'), ['status' => 400]);
+    }
+
+    // Force provider to heroicons (Lite only supports Heroicons)
+    $settings['activeProvider'] = 'heroicons';
+
+    // Sanitize palette
+    if (isset($settings['palette']) && is_array($settings['palette'])) {
+      foreach ($settings['palette'] as $i => $item) {
+        if (isset($item['label'])) {
+          $settings['palette'][$i]['label'] = sanitize_text_field($item['label']);
+        }
+        if (isset($item['hex'])) {
+          $settings['palette'][$i]['hex'] = sanitize_hex_color($item['hex']) ?: '#000000';
+        }
+        if (isset($item['token'])) {
+          $settings['palette'][$i]['token'] = sanitize_text_field($item['token']);
+        }
+      }
+    }
+
+    // Sanitize defaultToken
+    if (isset($settings['defaultToken'])) {
+      $settings['defaultToken'] = in_array($settings['defaultToken'], ['A', 'B', 'C'], true)
+        ? $settings['defaultToken']
+        : 'A';
+    }
+
+    update_option('acf_open_icons_settings', $settings);
+
+    return [
+      'success' => true,
+      'settings' => $settings,
+    ];
+  }
+
+  /**
+   * Restore default settings via REST.
+   */
+  public function restore_defaults(\WP_REST_Request $req) {
+    delete_option('acf_open_icons_settings');
+
+    $defaults = [
+      'activeProvider' => 'heroicons',
+      'pinnedVersion'  => 'latest',
+      'palette'        => [
+        ['token' => 'A', 'label' => 'Primary', 'hex' => '#18181b'],
+        ['token' => 'B', 'label' => 'Secondary', 'hex' => '#71717a'],
+        ['token' => 'C', 'label' => 'Accent', 'hex' => '#4f46e5'],
+      ],
+      'defaultToken'   => 'A',
+    ];
+
+    return [
+      'success' => true,
+      'settings' => $defaults,
     ];
   }
 }

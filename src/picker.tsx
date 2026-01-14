@@ -5,19 +5,19 @@ import IconPicker from './components/IconPicker';
 
 function mountPickers() {
   const fields = document.querySelectorAll(
-    '.acfoi-field:not([data-acfoi-mounted])'
+    '.acfoil-field:not([data-acfoil-mounted])'
   );
 
   // Simple registry to manage React roots per instance
   const registry: Record<string, { root: any; mount: HTMLElement }> = ((
     window as any
-  ).__ACFOI_REGISTRY__ = (window as any).__ACFOI_REGISTRY__ || {});
+  ).__ACFOIL_REGISTRY__ = (window as any).__ACFOIL_REGISTRY__ || {});
 
   fields.forEach((el) => {
     const host = el as HTMLElement;
 
     const keyOut = host.querySelector(
-      '[data-acfoi-key-out]'
+      '[data-acfoil-key-out]'
     ) as HTMLInputElement | null;
     const isClone = !!host.closest('.acf-clone');
     const isHiddenTpl =
@@ -39,16 +39,16 @@ function mountPickers() {
     // Ensure finalised fields have a unique instanceId and id (clones can duplicate IDs)
     let instanceId = host.dataset.acfoiInstanceId || host.id || '';
     const keyOutForId = host.querySelector(
-      '[data-acfoi-key-out]'
+      '[data-acfoil-key-out]'
     ) as HTMLInputElement | null;
     const stillCloneIndex = !!keyOutForId?.name?.includes('acfcloneindex');
     const idConflict =
       instanceId &&
       document.querySelectorAll(
-        `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
+        `.acfoil-field[data-acfoil-instance-id="${instanceId}"]`
       ).length > 1;
     if (!instanceId || idConflict || stillCloneIndex) {
-      const newId = `acfoi_${Date.now().toString(16)}_${Math.random()
+      const newId = `acfoil_${Date.now().toString(16)}_${Math.random()
         .toString(36)
         .slice(2)}`;
       host.id = newId;
@@ -61,7 +61,7 @@ function mountPickers() {
     // CRITICAL: Check if we already have a React root for this instance ID
     // Properly unmount any existing root before creating a new one
     const existing = registry[instanceId];
-    const existingMountId = `acfoi-mount-${instanceId}`;
+    const existingMountId = `acfoil-mount-${instanceId}`;
     if (existing) {
       try {
         existing.root.unmount?.();
@@ -84,15 +84,15 @@ function mountPickers() {
     const fieldKey = host.dataset.acfoiFieldKey || '';
     const fieldGroupKey = host.dataset.acfoiFieldGroupKey || '';
 
-    const preview = host.querySelector('[data-acfoi-preview]') as HTMLElement;
+    const preview = host.querySelector('[data-acfoil-preview]') as HTMLElement;
     const inputKey = host.querySelector(
-      '[data-acfoi-key-out]'
+      '[data-acfoil-key-out]'
     ) as HTMLInputElement;
     const inputSvg = host.querySelector(
-      '[data-acfoi-svg-out]'
+      '[data-acfoil-svg-out]'
     ) as HTMLTextAreaElement;
     const openBtn = host.querySelector(
-      '[data-acfoi-open]'
+      '[data-acfoil-open]'
     ) as HTMLButtonElement;
 
     // Create a mount point for the React modal - use instance ID for consistency
@@ -125,7 +125,7 @@ function mountPickers() {
           // CRITICAL: Check if the field we found is still in clone/template state
           // ACF may have re-cloned it, or we mounted to a clone that became a template again
           const testInput = liveHost.querySelector(
-            '[data-acfoi-key-out]'
+            '[data-acfoil-key-out]'
           ) as HTMLInputElement | null;
           const isCloneState =
             testInput?.name.includes('acfcloneindex') || false;
@@ -134,7 +134,7 @@ function mountPickers() {
           // If we're operating on a clone, find the REAL field
           if (isCloneState || isCloneElement) {
             const instanceId = liveHost.dataset.acfoiInstanceId;
-            const allFields = document.querySelectorAll('.acfoi-field');
+            const allFields = document.querySelectorAll('.acfoil-field');
             let actualField: HTMLElement | null = null;
 
             for (const field of allFields) {
@@ -142,7 +142,7 @@ function mountPickers() {
               // Match by instance ID (which should be unique per real field)
               if (f.dataset.acfoiInstanceId === instanceId) {
                 const testInp = f.querySelector(
-                  '[data-acfoi-key-out]'
+                  '[data-acfoil-key-out]'
                 ) as HTMLInputElement | null;
                 const notClone = !f.closest('.acf-clone');
                 const notCloneIndex = !testInp?.name.includes('acfcloneindex');
@@ -159,22 +159,22 @@ function mountPickers() {
           }
 
           const currentInputKey = liveHost.querySelector(
-            '[data-acfoi-key-out]'
+            '[data-acfoil-key-out]'
           ) as HTMLInputElement;
           const currentInputSvg = liveHost.querySelector(
-            '[data-acfoi-svg-out]'
+            '[data-acfoil-svg-out]'
           ) as HTMLTextAreaElement;
           const currentPreview = liveHost.querySelector(
-            '[data-acfoi-preview]'
+            '[data-acfoil-preview]'
           ) as HTMLElement;
           const currentOpenBtn = liveHost.querySelector(
-            '[data-acfoi-open]'
+            '[data-acfoil-open]'
           ) as HTMLButtonElement;
           const currentClearBtn = liveHost.querySelector(
-            '[data-acfoi-clear]'
+            '[data-acfoil-clear]'
           ) as HTMLButtonElement;
           const colorTokenInput = liveHost.querySelector(
-            '[data-acfoi-color-token-out]'
+            '[data-acfoil-color-token-out]'
           ) as HTMLInputElement;
 
           // Always update the key input (even if SVG is not yet available)
@@ -292,21 +292,21 @@ function mountPickers() {
     // Attach open button click handler - ensure only one listener per instance
     if (openBtn) {
       // Namespaced listener keys via dataset
-      if ((openBtn as any).__acfoiBound__) {
+      if ((openBtn as any).__acfoilBound__) {
         // Already bound for this instance
       } else {
-        (openBtn as any).__acfoiBound__ = true;
+        (openBtn as any).__acfoilBound__ = true;
 
         const clickHandler = () => {
           window.dispatchEvent(
-            new CustomEvent('acfoi-open-modal', {
+            new CustomEvent('acfoil-open-modal', {
               detail: { instanceId },
             })
           );
         };
         openBtn.addEventListener('click', clickHandler);
         const prewarm = () => {
-          window.dispatchEvent(new CustomEvent('acfoi-prewarm'));
+          window.dispatchEvent(new CustomEvent('acfoil-prewarm'));
         };
         openBtn.addEventListener('mouseenter', prewarm, { passive: true });
         openBtn.addEventListener('focus', prewarm, { passive: true });
@@ -336,33 +336,33 @@ if (document.readyState === 'loading') {
   mountPickers();
 });
 
-// Event delegation fallback: ensure clicks on [data-acfoi-open] trigger the modal
+// Event delegation fallback: ensure clicks on [data-acfoil-open] trigger the modal
 document.addEventListener(
   'click',
   (ev) => {
     const target = (ev.target as HTMLElement)?.closest?.(
-      '[data-acfoi-open]'
+      '[data-acfoil-open]'
     ) as HTMLButtonElement | null;
     if (!target) return;
-    const host = target.closest('.acfoi-field') as HTMLElement | null;
+    const host = target.closest('.acfoil-field') as HTMLElement | null;
     const instanceId = host?.dataset.acfoiInstanceId || host?.id || '';
     window.dispatchEvent(
-      new CustomEvent('acfoi-open-modal', { detail: { instanceId } })
+      new CustomEvent('acfoil-open-modal', { detail: { instanceId } })
     );
     ev.preventDefault();
   },
   true
 );
 
-// Event delegation for remove/clear button: ensure clicks on [data-acfoi-clear] work for dynamically added fields
+// Event delegation for remove/clear button: ensure clicks on [data-acfoil-clear] work for dynamically added fields
 document.addEventListener(
   'click',
   (ev) => {
     const target = (ev.target as HTMLElement)?.closest?.(
-      '[data-acfoi-clear]'
+      '[data-acfoil-clear]'
     ) as HTMLButtonElement | null;
     if (!target) return;
-    const host = target.closest('.acfoi-field') as HTMLElement | null;
+    const host = target.closest('.acfoil-field') as HTMLElement | null;
     if (!host) return;
 
     // Re-query the LIVE DOM element to handle ACF's DOM manipulation
@@ -371,14 +371,14 @@ document.addEventListener(
     if (!liveHost) {
       // Fallback: try to find by instance ID
       liveHost = document.querySelector(
-        `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
+        `.acfoil-field[data-acfoil-instance-id="${instanceId}"]`
       ) as HTMLElement | null;
     }
     if (!liveHost) return;
 
     // Check if field is in clone state
     const testInput = liveHost.querySelector(
-      '[data-acfoi-key-out]'
+      '[data-acfoil-key-out]'
     ) as HTMLInputElement | null;
     const isCloneState =
       testInput?.name.includes('acfcloneindex') || false;
@@ -386,14 +386,14 @@ document.addEventListener(
 
     // If we're operating on a clone, find the REAL field
     if (isCloneState || isCloneElement) {
-      const allFields = document.querySelectorAll('.acfoi-field');
+      const allFields = document.querySelectorAll('.acfoil-field');
       let actualField: HTMLElement | null = null;
 
       for (const field of allFields) {
         const f = field as HTMLElement;
         if (f.dataset.acfoiInstanceId === instanceId) {
           const testInp = f.querySelector(
-            '[data-acfoi-key-out]'
+            '[data-acfoil-key-out]'
           ) as HTMLInputElement | null;
           const notClone = !f.closest('.acf-clone');
           const notCloneIndex = !testInp?.name.includes('acfcloneindex');
@@ -411,22 +411,22 @@ document.addEventListener(
 
     // Clear the icon data
     const keyInput = liveHost.querySelector(
-      '[data-acfoi-key-out]'
+      '[data-acfoil-key-out]'
     ) as HTMLInputElement | null;
     const svgInput = liveHost.querySelector(
-      '[data-acfoi-svg-out]'
+      '[data-acfoil-svg-out]'
     ) as HTMLTextAreaElement | null;
     const tokenInput = liveHost.querySelector(
-      '[data-acfoi-color-token-out]'
+      '[data-acfoil-color-token-out]'
     ) as HTMLInputElement | null;
     const preview = liveHost.querySelector(
-      '[data-acfoi-preview]'
+      '[data-acfoil-preview]'
     ) as HTMLElement | null;
     const openBtn = liveHost.querySelector(
-      '[data-acfoi-open]'
+      '[data-acfoil-open]'
     ) as HTMLButtonElement | null;
     const clearBtn = liveHost.querySelector(
-      '[data-acfoi-clear]'
+      '[data-acfoil-clear]'
     ) as HTMLButtonElement | null;
 
     if (keyInput) {

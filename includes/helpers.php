@@ -310,6 +310,8 @@ function acfoil_open_icon($value = null, $atts = []) {
  * @param array        $atts  Display arguments.
  * @return string|void
  */
-function acf_open_icon($value = null, $atts = []) {
-  return acfoil_open_icon($value, $atts);
+if (! function_exists('acf_open_icon')) {
+  function acf_open_icon($value = null, $atts = []) {
+    return acfoil_open_icon($value, $atts);
+  }
 }

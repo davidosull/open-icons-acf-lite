@@ -247,7 +247,7 @@ JS;
         $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
         $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
         $defaultToken = $settings['defaultToken'] ?? 'A';
-        echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true;</script>' . "\n";
+        echo '<script>window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOIL_LITE__ = true;</script>' . "\n";
       }, 5);
     } else {
       $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/manifest.json';
@@ -289,7 +289,7 @@ JS;
       $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
       $defaultToken = $settings['defaultToken'] ?? 'A';
 
-      wp_add_inline_script('acfoil-picker', 'window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true;', 'before');
+      wp_add_inline_script('acfoil-picker', 'window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOIL_LITE__ = true;', 'before');
       wp_enqueue_script('acfoil-picker');
     }
   }
@@ -304,11 +304,11 @@ JS;
     $tracking = new Tracking();
     $trackingStatus = $tracking->get_status();
 
-    add_action('admin_head', function () use ($trackingStatus) {
+    add_action('admin_head', function () use ($settings, $trackingStatus) {
       echo '<script>window.wpApiSettings = window.wpApiSettings || ' . wp_json_encode([
         'root' => esc_url_raw(rest_url()),
         'nonce' => wp_create_nonce('wp_rest'),
-      ]) . '; window.__ACFOIL_TRACKING__ = ' . wp_json_encode($trackingStatus) . ';</script>' . "\n";
+      ]) . '; window.__ACFOIL_TRACKING__ = ' . wp_json_encode($trackingStatus) . '; window.__ACFOIL_SETTINGS__ = ' . wp_json_encode($settings) . ';</script>' . "\n";
     }, 1);
 
     if (self::is_dev_mode()) {
@@ -322,7 +322,7 @@ JS;
       );
       self::ensure_module_script_filter();
       add_action('admin_footer', function () use ($palette, $defaultToken, $libraryUrl) {
-        echo '<script>window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true;</script>' . "\n";
+        echo '<script>window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOIL_LITE__ = true;</script>' . "\n";
       }, 5);
     } else {
       $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/manifest.json';
@@ -365,7 +365,7 @@ JS;
         'nonce' => wp_create_nonce('wp_rest'),
       ]);
 
-      wp_add_inline_script('acfoil-settings', 'window.__ACFOI_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOI_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOI_LITE__ = true; window.__ACFOIL_TRACKING__ = ' . wp_json_encode($trackingStatus) . ';', 'before');
+      wp_add_inline_script('acfoil-settings', 'window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOIL_LITE__ = true; window.__ACFOIL_TRACKING__ = ' . wp_json_encode($trackingStatus) . '; window.__ACFOIL_SETTINGS__ = ' . wp_json_encode($settings) . ';', 'before');
       wp_enqueue_script('acfoil-settings');
     }
   }

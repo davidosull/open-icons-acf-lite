@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { SelectMenu } from './ui/select-menu';
+import { fuzzySearch } from '../lib/fuzzy-search';
 
 type IconItem = {
   key: string;
@@ -21,7 +22,7 @@ function useRecentIcons(
   version: string,
   modalOpen?: boolean
 ) {
-  const storageKey = `acfoi_recent_${provider}@${version}`;
+  const storageKey = `acfoil_recent_${provider}@${version}`;
   const [recent, setRecent] = React.useState<string[]>([]);
 
   const loadRecent = React.useCallback(() => {
@@ -88,7 +89,7 @@ function getFieldContext(instanceId: string): {
   repeaterRowIndex: string | number | null; // Can be numeric or alphanumeric ID
 } {
   const field = document.querySelector(
-    `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
+    `.acfoil-field[data-acfoil-instance-id="${instanceId}"]`
   ) as HTMLElement | null;
   if (!field) {
     return {
@@ -105,7 +106,7 @@ function getFieldContext(instanceId: string): {
   let fieldGroupKey = field.dataset.acfoiFieldGroupKey || '';
 
   // Get the input element to parse the name path
-  const keyInput = field.querySelector('[data-acfoi-key-out]') as HTMLInputElement | null;
+  const keyInput = field.querySelector('[data-acfoil-key-out]') as HTMLInputElement | null;
   const inputName = keyInput?.name || '';
 
   // If not set, try to detect from DOM structure
@@ -198,8 +199,8 @@ function getFieldContext(instanceId: string): {
       }
 
       // Debug logging
-      if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
-        console.log('[ACFOI] Flexible extraction:', {
+      if (typeof window !== 'undefined' && (window as any).__ACFOIL_DEBUG__) {
+        console.log('[ACFOIL] Flexible extraction:', {
           inputName,
           flexibleLayout,
           flexibleLayoutInstanceIndex,
@@ -293,8 +294,8 @@ function getFieldContext(instanceId: string): {
   };
 
   // Debug logging
-  if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
-    console.log('[ACFOI] getFieldContext:', {
+  if (typeof window !== 'undefined' && (window as any).__ACFOIL_DEBUG__) {
+    console.log('[ACFOIL] getFieldContext:', {
       instanceId,
       inputName,
       inputNameFull: inputName, // Show full name for debugging
@@ -318,7 +319,7 @@ function getLastColorStorageKey(
   repeaterKey: string | null,
   repeaterRowIndex: string | number | null
 ): string {
-  const parts = ['acfoi_last_color', fieldGroupKey];
+  const parts = ['acfoil_last_color', fieldGroupKey];
 
   // Include flexible content context if present
   if (flexibleContentFieldKey && flexibleLayout) {
@@ -341,8 +342,8 @@ function getLastColorStorageKey(
   const key = parts.join('_');
 
   // Debug logging
-  if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
-    console.log('[ACFOI] getLastColorStorageKey:', {
+  if (typeof window !== 'undefined' && (window as any).__ACFOIL_DEBUG__) {
+    console.log('[ACFOIL] getLastColorStorageKey:', {
       fieldGroupKey,
       flexibleContentFieldKey,
       flexibleLayout,
@@ -377,8 +378,8 @@ function getLastColor(
     const stored = localStorage.getItem(key);
 
     // Debug logging
-    if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
-      console.log('[ACFOI] getLastColor:', {
+    if (typeof window !== 'undefined' && (window as any).__ACFOIL_DEBUG__) {
+      console.log('[ACFOIL] getLastColor:', {
         lookupKey: key,
         found: !!stored,
         storedValue: stored ? JSON.parse(stored) : null,
@@ -389,7 +390,7 @@ function getLastColor(
       const storedColor = JSON.parse(stored);
       // Always resolve hex from current palette to ensure we use current color values
       // The stored hex might be outdated if palette colors changed
-      const palette: { token: string; hex: string }[] = (window as any).__ACFOI_PALETTE__?.items || [];
+      const palette: { token: string; hex: string }[] = (window as any).__ACFOIL_PALETTE__?.items || [];
       const currentPaletteItem = palette.find((p) => p.token === storedColor.token);
       if (currentPaletteItem) {
         return {
@@ -401,8 +402,8 @@ function getLastColor(
       return storedColor;
     }
   } catch (e) {
-    if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
-      console.error('[ACFOI] getLastColor error:', e);
+    if (typeof window !== 'undefined' && (window as any).__ACFOIL_DEBUG__) {
+      console.error('[ACFOIL] getLastColor error:', e);
     }
   }
   return null;
@@ -429,8 +430,8 @@ function saveLastColor(
     );
 
     // Debug logging
-    if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
-      console.log('[ACFOI] saveLastColor:', {
+    if (typeof window !== 'undefined' && (window as any).__ACFOIL_DEBUG__) {
+      console.log('[ACFOIL] saveLastColor:', {
         storageKey: key,
         color,
       });
@@ -438,8 +439,8 @@ function saveLastColor(
 
     localStorage.setItem(key, JSON.stringify(color));
   } catch (e) {
-    if (typeof window !== 'undefined' && (window as any).__ACFOI_DEBUG__) {
-      console.error('[ACFOI] saveLastColor error:', e);
+    if (typeof window !== 'undefined' && (window as any).__ACFOIL_DEBUG__) {
+      console.error('[ACFOIL] saveLastColor error:', e);
     }
   }
 }
@@ -530,13 +531,13 @@ export default function IconPicker({
   const [query, setQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const palette: { token: string; label?: string; hex: string }[] =
-    (window as any).__ACFOI_PALETTE__?.items || [];
+    (window as any).__ACFOIL_PALETTE__?.items || [];
   const defaultToken: string =
-    (window as any).__ACFOI_PALETTE__?.default || 'A';
+    (window as any).__ACFOIL_PALETTE__?.default || 'A';
   const defaultHex =
     palette.find((i) => i.token === defaultToken)?.hex || '#111111';
   const libraryInfo: { url: string; name: string } = (window as any)
-    .__ACFOI_LIBRARY__ || { url: 'https://lucide.dev/icons', name: 'Lucide' };
+    .__ACFOIL_LIBRARY__ || { url: 'https://lucide.dev/icons', name: 'Lucide Icons' };
 
   // Initialize color state - check for last color synchronously to avoid flash
   // Use function initializer to check synchronously on each mount
@@ -547,11 +548,11 @@ export default function IconPicker({
 
     // First, check if current icon has a color
     const field = document.querySelector(
-      `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
+      `.acfoil-field[data-acfoil-instance-id="${instanceId}"]`
     ) as HTMLElement | null;
     if (field) {
       const colorTokenInput = field.querySelector(
-        '[data-acfoi-color-token-out]'
+        '[data-acfoil-color-token-out]'
       ) as HTMLInputElement | null;
       if (colorTokenInput?.value) {
         const token = colorTokenInput.value;
@@ -623,11 +624,11 @@ export default function IconPicker({
     if (open && instanceId) {
       // Find the field element by instance ID
       const field = document.querySelector(
-        `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
+        `.acfoil-field[data-acfoil-instance-id="${instanceId}"]`
       ) as HTMLElement | null;
       if (field) {
         const keyInput = field.querySelector(
-          '[data-acfoi-key-out]'
+          '[data-acfoil-key-out]'
         ) as HTMLInputElement | null;
         const currentKey = keyInput?.value?.trim() || null;
         setCurrentIconKey(currentKey);
@@ -635,7 +636,7 @@ export default function IconPicker({
         // Load current icon into cache if not already loaded
         if (currentKey && !cache[currentKey]) {
           const svgInput = field.querySelector(
-            '[data-acfoi-svg-out]'
+            '[data-acfoil-svg-out]'
           ) as HTMLTextAreaElement | null;
           if (svgInput?.value) {
             // Extract the base SVG (without color) by normalizing to currentColor
@@ -646,7 +647,7 @@ export default function IconPicker({
 
         // Sync the color picker - only on initial open, don't override user changes
         const colorTokenInput = field.querySelector(
-          '[data-acfoi-color-token-out]'
+          '[data-acfoil-color-token-out]'
         ) as HTMLInputElement | null;
         if (colorTokenInput?.value) {
           // If icon already has a color, use it (only if we haven't initialized yet)
@@ -688,7 +689,7 @@ export default function IconPicker({
   // Fetch current icon SVG if not in cache (after ensureSvg is defined)
   React.useEffect(() => {
     if (open && currentIconKey && !cache[currentIconKey] && restBase) {
-      const url = `${restBase}/acf-open-icons/v1/icon?provider=${encodeURIComponent(
+      const url = `${restBase}/acf-open-icons-lite/v1/icon?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}&key=${encodeURIComponent(currentIconKey)}`;
       fetch(url)
@@ -727,7 +728,7 @@ export default function IconPicker({
   // Hydrate cache from sessionStorage for this provider/version
   React.useEffect(() => {
     try {
-      const key = `acfoi_cache_${provider}@${version}`;
+      const key = `acfoil_cache_${provider}@${version}`;
       const raw = sessionStorage.getItem(key);
       if (raw) {
         const obj = JSON.parse(raw) as Record<string, string>;
@@ -740,7 +741,7 @@ export default function IconPicker({
   React.useEffect(() => {
     const id = setTimeout(() => {
       try {
-        const key = `acfoi_cache_${provider}@${version}`;
+        const key = `acfoil_cache_${provider}@${version}`;
         sessionStorage.setItem(key, JSON.stringify(cache));
       } catch {}
     }, 250);
@@ -752,7 +753,7 @@ export default function IconPicker({
     let mounted = true;
     setManifestLoading(true);
     async function load() {
-      const url = `${restBase}/acf-open-icons/v1/manifest?provider=${encodeURIComponent(
+      const url = `${restBase}/acf-open-icons-lite/v1/manifest?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}`;
       const res = await fetch(url);
@@ -780,7 +781,7 @@ export default function IconPicker({
     if (!open || all.length === 0) return;
     const keysToEagerLoad = all.slice(0, 24).filter((k) => !cache[k]);
     if (keysToEagerLoad.length === 0) return;
-    const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
+    const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
       provider
     )}&version=${encodeURIComponent(version)}&keys=${keysToEagerLoad.join(',')}`;
       fetch(url)
@@ -803,7 +804,7 @@ export default function IconPicker({
     if (!open || recent.length === 0) return;
     const missing = recent.filter((k) => !cache[k]);
     if (missing.length === 0) return;
-    const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
+    const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
       provider
     )}&version=${encodeURIComponent(version)}&keys=${missing.join(',')}`;
     fetch(url)
@@ -829,7 +830,7 @@ export default function IconPicker({
       if (all.length === 0) return;
       const keys = all.slice(0, 24).filter((k) => !cache[k]);
       if (!keys.length) return;
-      const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
+      const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}&keys=${keys.join(',')}`;
       fetch(url)
@@ -847,18 +848,13 @@ export default function IconPicker({
         })
         .catch(() => {});
     }
-    window.addEventListener('acfoi-prewarm', onPrewarm);
-    return () => window.removeEventListener('acfoi-prewarm', onPrewarm);
+    window.addEventListener('acfoil-prewarm', onPrewarm);
+    return () => window.removeEventListener('acfoil-prewarm', onPrewarm);
   }, [provider, version, restBase, all, cache]);
 
   const list = React.useMemo(() => {
-    const startTime = performance.now();
-
-    // Always use all icons, filter by query if provided
-    const lowerQuery = debouncedQuery ? debouncedQuery.toLowerCase() : '';
-    const filtered = lowerQuery
-      ? (all || []).filter((k) => k.toLowerCase().includes(lowerQuery))
-      : all || [];
+    // Use fuzzy search for query, otherwise return all icons
+    const filtered = fuzzySearch(all || [], debouncedQuery);
 
     // Deduplicate to prevent duplicate key warnings
     const uniqueFiltered = Array.from(new Set(filtered));
@@ -961,7 +957,7 @@ export default function IconPicker({
 
     // Fetch all chunks in parallel
     const fetchPromises = chunks.map((chunk) => {
-      const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
+      const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
         provider
       )}&version=${encodeURIComponent(version)}&keys=${chunk.join(',')}`;
       return fetch(url)
@@ -1025,7 +1021,7 @@ export default function IconPicker({
 
               Promise.all(
                 bgChunks.map((chunk) => {
-                  const url = `${restBase}/acf-open-icons/v1/bundle?provider=${encodeURIComponent(
+                  const url = `${restBase}/acf-open-icons-lite/v1/bundle?provider=${encodeURIComponent(
                     provider
                   )}&version=${encodeURIComponent(version)}&keys=${chunk.join(
                     ','
@@ -1133,7 +1129,7 @@ export default function IconPicker({
 
   async function ensureSvg(key: string) {
     if (cache[key]) return cache[key];
-    const url = `${restBase}/acf-open-icons/v1/icon?provider=${encodeURIComponent(
+    const url = `${restBase}/acf-open-icons-lite/v1/icon?provider=${encodeURIComponent(
       provider
     )}&version=${encodeURIComponent(version)}&key=${encodeURIComponent(key)}`;
     const res = await fetch(url);
@@ -1222,11 +1218,11 @@ export default function IconPicker({
         // Before opening, check and update color synchronously to avoid flash
         if (instanceId) {
           const field = document.querySelector(
-            `.acfoi-field[data-acfoi-instance-id="${instanceId}"]`
+            `.acfoil-field[data-acfoil-instance-id="${instanceId}"]`
           ) as HTMLElement | null;
           if (field) {
             const colorTokenInput = field.querySelector(
-              '[data-acfoi-color-token-out]'
+              '[data-acfoil-color-token-out]'
             ) as HTMLInputElement | null;
             if (colorTokenInput?.value) {
               const token = colorTokenInput.value;
@@ -1255,8 +1251,8 @@ export default function IconPicker({
         setOpen(true);
       }
     };
-    window.addEventListener('acfoi-open-modal', handler);
-    return () => window.removeEventListener('acfoi-open-modal', handler);
+    window.addEventListener('acfoil-open-modal', handler);
+    return () => window.removeEventListener('acfoil-open-modal', handler);
   }, [instanceId, useLastColor, fieldGroupKey, palette, isControlled]);
 
   // Simple luminance to detect overly light colors
@@ -1599,7 +1595,7 @@ export default function IconPicker({
             </a>
             .
           </div>
-          {(window as any).__ACFOI_LITE__ && (
+          {(window as any).__ACFOIL_LITE__ && (
             <div className='text-emerald-600'>
               Want 6,000+ more icons?{' '}
               <a

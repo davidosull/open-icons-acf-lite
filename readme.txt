@@ -1,4 +1,4 @@
-=== ACF Open Icons Lite ===
+=== Advanced Custom Fields: Open Icons Lite ===
 Contributors: davidosullio
 Tags: acf, icons, svg, heroicons, custom fields
 Requires at least: 5.8

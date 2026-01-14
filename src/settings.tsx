@@ -8,7 +8,6 @@ import { SelectMenu } from './components/ui/select-menu';
 import { Button } from './components/ui/button';
 import { ColorPicker } from './components/ui/color-picker';
 import { useToaster } from './components/ui/toast';
-import { Alert, AlertTitle, AlertDescription } from './components/ui/alert';
 import {
   Card,
   CardContent,
@@ -17,39 +16,37 @@ import {
   CardTitle,
 } from './components/ui/card';
 import { Badge } from './components/ui/badge';
-import { Separator } from './components/ui/separator';
 
-function SettingsUI({
-  form,
-  purgeForm,
-}: {
-  form: HTMLFormElement;
-  purgeForm: HTMLFormElement | null;
-}) {
-  const opt = 'acf_open_icons_settings';
-  const q = (n: string) =>
-    form.querySelector<HTMLInputElement | HTMLSelectElement>(
-      `[name="${opt}${n}"]`
-    );
+type Settings = {
+  activeProvider: string;
+  pinnedVersion: string;
+  palette: Array<{ token: string; label: string; hex: string }>;
+  defaultToken: string;
+};
 
+const MIN_LOADING_MS = 400;
+
+async function withMinDelay<T>(promise: Promise<T>, minMs = MIN_LOADING_MS): Promise<T> {
+  const start = Date.now();
+  const result = await promise;
+  const elapsed = Date.now() - start;
+  if (elapsed < minMs) {
+    await new Promise((r) => setTimeout(r, minMs - elapsed));
+  }
+  return result;
+}
+
+function SettingsUI({ initialSettings }: { initialSettings: Settings }) {
   const toastRef = React.useRef<HTMLDivElement | null>(null);
   const { push, portal } = useToaster(toastRef.current);
 
-  const pALabelEl = q('[palette][0][label]') as HTMLInputElement;
-  const pAHexEl = q('[palette][0][hex]') as HTMLInputElement;
-  const pBLabelEl = q('[palette][1][label]') as HTMLInputElement;
-  const pBHexEl = q('[palette][1][hex]') as HTMLInputElement;
-  const pCLabelEl = q('[palette][2][label]') as HTMLInputElement;
-  const pCHexEl = q('[palette][2][hex]') as HTMLInputElement;
-  const defaultTokenEl = q('[defaultToken]') as HTMLSelectElement;
-
-  const [aLabel, setALabel] = React.useState(pALabelEl?.value || 'Primary');
-  const [aHex, setAHex] = React.useState(pAHexEl?.value || '#18181b');
-  const [bLabel, setBLabel] = React.useState(pBLabelEl?.value || 'Secondary');
-  const [bHex, setBHex] = React.useState(pBHexEl?.value || '#71717a');
-  const [cLabel, setCLabel] = React.useState(pCLabelEl?.value || 'Accent');
-  const [cHex, setCHex] = React.useState(pCHexEl?.value || '#34d399');
-  const [def, setDef] = React.useState(defaultTokenEl?.value || 'A');
+  const [aLabel, setALabel] = React.useState(initialSettings.palette[0]?.label || 'Primary');
+  const [aHex, setAHex] = React.useState(initialSettings.palette[0]?.hex || '#18181b');
+  const [bLabel, setBLabel] = React.useState(initialSettings.palette[1]?.label || 'Secondary');
+  const [bHex, setBHex] = React.useState(initialSettings.palette[1]?.hex || '#71717a');
+  const [cLabel, setCLabel] = React.useState(initialSettings.palette[2]?.label || 'Accent');
+  const [cHex, setCHex] = React.useState(initialSettings.palette[2]?.hex || '#4f46e5');
+  const [def, setDef] = React.useState(initialSettings.defaultToken || 'A');
 
   // Tracking state
   const trackingStatus = (window as any).__ACFOIL_TRACKING__ || {
@@ -59,10 +56,14 @@ function SettingsUI({
     trackingStatus.enabled
   );
   const [togglingTracking, setTogglingTracking] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [purging, setPurging] = React.useState(false);
+  const [restoring, setRestoring] = React.useState(false);
 
   const restBase =
     (window as any).wpApiSettings?.root?.replace(/\/$/, '') || '/wp-json';
   const nonce = (window as any).wpApiSettings?.nonce || '';
+  const apiBase = `${restBase}/acf-open-icons/v1`;
 
   // Premium provider info for upsell
   const premiumProviders = [
@@ -74,18 +75,15 @@ function SettingsUI({
   const handleToggleTracking = React.useCallback(async () => {
     setTogglingTracking(true);
     try {
-      const response = await fetch(
-        `${restBase}/acf-open-icons/v1/tracking/toggle`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-WP-Nonce': nonce,
-          },
-          body: JSON.stringify({ enable: !trackingEnabled }),
-        }
-      );
+      const response = await fetch(`${apiBase}/tracking/toggle`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': nonce,
+        },
+        body: JSON.stringify({ enable: !trackingEnabled }),
+      });
 
       const data = await response.json();
 
@@ -99,7 +97,7 @@ function SettingsUI({
             : 'Usage tracking has been disabled.',
         });
       }
-    } catch (error) {
+    } catch {
       push({
         type: 'error',
         title: 'Error',
@@ -108,116 +106,145 @@ function SettingsUI({
     } finally {
       setTogglingTracking(false);
     }
-  }, [trackingEnabled, restBase, nonce, push]);
+  }, [trackingEnabled, apiBase, nonce, push]);
 
-  React.useEffect(() => {
-    if (pALabelEl) pALabelEl.value = aLabel;
-  }, [aLabel]);
-  React.useEffect(() => {
-    if (pAHexEl) pAHexEl.value = aHex;
-  }, [aHex]);
-  React.useEffect(() => {
-    if (pBLabelEl) pBLabelEl.value = bLabel;
-  }, [bLabel]);
-  React.useEffect(() => {
-    if (pBHexEl) pBHexEl.value = bHex;
-  }, [bHex]);
-  React.useEffect(() => {
-    if (pCLabelEl) pCLabelEl.value = cLabel;
-  }, [cLabel]);
-  React.useEffect(() => {
-    if (pCHexEl) pCHexEl.value = cHex;
-  }, [cHex]);
-  React.useEffect(() => {
-    if (defaultTokenEl) defaultTokenEl.value = def;
-  }, [def]);
-
-  // Hide native buttons and WP notices
-  React.useEffect(() => {
-    const buttons = Array.from(
-      form.querySelectorAll(
-        'p.submit input[type="submit"], .submit input[type="submit"], .submit button'
-      )
-    ) as HTMLElement[];
-    buttons.forEach((b) => (b.style.display = 'none'));
-    const allForms = document.querySelectorAll(
-      'form[action*="admin-post.php"]'
-    );
-    allForms.forEach((f) => {
-      const btns = Array.from(
-        f.querySelectorAll('input[type="submit"], button')
-      ) as HTMLElement[];
-      btns.forEach((b) => (b.style.display = 'none'));
-    });
-  }, []);
-
-  // Mark intents so we can show toasts after redirect
-  React.useEffect(() => {
-    const onSubmit = () => {
-      try {
-        sessionStorage.setItem('acfoil_toast_after', 'settings_saved');
-      } catch {}
-    };
-    form.addEventListener('submit', onSubmit);
-    return () => form.removeEventListener('submit', onSubmit);
-  }, [form]);
-
-  // Detect redirects after save/purge and show toast
-  React.useEffect(() => {
-    const url = new URL(window.location.href);
-    const settingsSaved = url.searchParams.get('settings-updated');
-    const purged = url.searchParams.get('purged');
-    const restored = url.searchParams.get('restored');
-
-    let ss = '';
+  // Save settings
+  const handleSave = React.useCallback(async () => {
+    setSaving(true);
     try {
-      ss = sessionStorage.getItem('acfoil_toast_after') || '';
-      if (ss) sessionStorage.removeItem('acfoil_toast_after');
-    } catch {}
+      const settings = {
+        activeProvider: 'heroicons',
+        pinnedVersion: 'latest',
+        palette: [
+          { token: 'A', label: aLabel, hex: aHex },
+          { token: 'B', label: bLabel, hex: bHex },
+          { token: 'C', label: cLabel, hex: cHex },
+        ],
+        defaultToken: def,
+      };
 
-    if (settingsSaved) {
+      const response = await withMinDelay(
+        fetch(`${apiBase}/settings`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-WP-Nonce': nonce,
+          },
+          body: JSON.stringify(settings),
+        })
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        push({
+          type: 'success',
+          title: 'Saved',
+          message: 'Settings updated.',
+        });
+      } else {
+        throw new Error(data.message || 'Failed to save');
+      }
+    } catch {
       push({
-        type: 'success',
-        title: 'Saved',
-        message: 'Settings updated.',
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to save settings.',
       });
-      url.searchParams.delete('settings-updated');
-      window.history.replaceState({}, '', url.toString());
-    } else if (ss === 'settings_saved') {
-      push({
-        type: 'success',
-        title: 'Saved',
-        message: 'Settings updated.',
-      });
+    } finally {
+      setSaving(false);
     }
-    if (purged) {
+  }, [aLabel, aHex, bLabel, bHex, cLabel, cHex, def, apiBase, nonce, push]);
+
+  // Purge cache
+  const handlePurge = React.useCallback(async () => {
+    setPurging(true);
+    try {
+      const response = await withMinDelay(
+        fetch(`${apiBase}/cache/purge`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-WP-Nonce': nonce,
+          },
+          body: JSON.stringify({ provider: 'heroicons', version: 'latest' }),
+        })
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.ok) {
+        push({
+          type: 'success',
+          title: 'Cache',
+          message: 'Icon cache purged.',
+        });
+      } else {
+        throw new Error('Failed to purge');
+      }
+    } catch {
       push({
-        type: 'success',
-        title: 'Cache',
-        message: 'Icon cache purged.',
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to purge cache.',
       });
-      url.searchParams.delete('purged');
-      window.history.replaceState({}, '', url.toString());
+    } finally {
+      setPurging(false);
     }
-    if (restored) {
+  }, [apiBase, nonce, push]);
+
+  // Restore defaults
+  const handleRestore = React.useCallback(async () => {
+    setRestoring(true);
+    try {
+      const response = await withMinDelay(
+        fetch(`${apiBase}/settings/restore`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-WP-Nonce': nonce,
+          },
+        })
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Update local state with defaults
+        setALabel('Primary');
+        setAHex('#18181b');
+        setBLabel('Secondary');
+        setBHex('#71717a');
+        setCLabel('Accent');
+        setCHex('#4f46e5');
+        setDef('A');
+
+        push({
+          type: 'success',
+          title: 'Restored',
+          message: 'Defaults restored.',
+        });
+      } else {
+        throw new Error('Failed to restore');
+      }
+    } catch {
       push({
-        type: 'success',
-        title: 'Restored',
-        message: 'Defaults restored.',
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to restore defaults.',
       });
-      url.searchParams.delete('restored');
-      window.history.replaceState({}, '', url.toString());
-      setTimeout(() => {
-        window.location.reload();
-      }, 2500);
+    } finally {
+      setRestoring(false);
     }
-  }, [push]);
+  }, [apiBase, nonce, push]);
 
   const controlClass = 'max-w-[520px]';
 
   return (
-    <div className='acfoi-settings-ui mt-3'>
-      <div ref={toastRef} />
+    <div className='acfoil-settings-ui mt-3'>
       {portal}
       <div className='space-y-6 max-w-[576px]'>
         {/* Upgrade Banner */}
@@ -283,43 +310,22 @@ function SettingsUI({
           </CardContent>
         </Card>
 
-        {/* Icon Set (Heroicons only) */}
+        {/* Icon Set */}
         <div className='rounded-md border bg-white p-4'>
           <div className='grid gap-3'>
             <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
               <Label>Icon Set</Label>
-              <div className='flex items-center gap-2'>
-                <Badge variant='success'>Heroicons</Badge>
-                <span className='text-sm text-muted-foreground'>292 icons</span>
-              </div>
-            </div>
-            <div className='grid grid-cols-[180px_1fr] items-start gap-3'>
-              <span className='text-sm text-muted-foreground'>
-                Premium icon sets
-              </span>
-              <div className='flex flex-wrap gap-3'>
-                {premiumProviders.map((p) => (
-                  <div
-                    key={p.key}
-                    className='flex items-center gap-1.5 text-xs text-zinc-400'
-                  >
-                    <svg
-                      className='w-3.5 h-3.5'
-                      fill='none'
-                      stroke='currentColor'
-                      viewBox='0 0 24 24'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth='2'
-                        d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
-                      />
-                    </svg>
-                    {p.label}
-                  </div>
-                ))}
-              </div>
+              <SelectMenu
+                value='heroicons'
+                onChange={() => {}}
+                items={[
+                  { value: 'heroicons', label: 'Heroicons' },
+                  { value: 'lucide', label: 'Lucide Icons', disabled: true, badge: 'Premium' },
+                  { value: 'tabler', label: 'Tabler Icons', disabled: true, badge: 'Premium' },
+                  { value: 'custom', label: 'Custom Icons', disabled: true, badge: 'Premium' },
+                ]}
+                className={controlClass}
+              />
             </div>
           </div>
         </div>
@@ -417,32 +423,35 @@ function SettingsUI({
 
         {/* Action Buttons */}
         <div className='flex items-center gap-3'>
-          <Button onClick={() => form.requestSubmit()} variant='primary'>
-            Save Changes
-          </Button>
-          {purgeForm && (
-            <Button
-              onClick={() => purgeForm.requestSubmit()}
-              variant='secondary'
-            >
-              Purge Icon Cache
-            </Button>
-          )}
           <Button
-            onClick={() => {
-              const restoreForm = document
-                .querySelector(
-                  'form input[name="action"][value="acfoil_restore_defaults"]'
-                )
-                ?.closest('form') as HTMLFormElement | null;
-              if (restoreForm) restoreForm.requestSubmit();
-            }}
+            onClick={handleSave}
+            variant='primary'
+            disabled={saving}
+          >
+            <span className={saving ? 'invisible' : ''}>Save Changes</span>
+            {saving && <span className='absolute'>Saving...</span>}
+          </Button>
+          <Button
+            onClick={handlePurge}
+            variant='secondary'
+            disabled={purging}
+          >
+            <span className={purging ? 'invisible' : ''}>Purge Icon Cache</span>
+            {purging && <span className='absolute'>Purging...</span>}
+          </Button>
+          <Button
+            onClick={handleRestore}
             variant='secondary'
             className='border-red-200 text-red-700 hover:bg-red-50'
+            disabled={restoring}
           >
-            Restore Defaults
+            <span className={restoring ? 'invisible' : ''}>Restore Defaults</span>
+            {restoring && <span className='absolute'>Restoring...</span>}
           </Button>
         </div>
+
+        {/* Toast container - below buttons */}
+        <div ref={toastRef} />
       </div>
     </div>
   );
@@ -453,21 +462,33 @@ function mount() {
   if (!wrap) {
     return;
   }
+
+  // Get initial settings from the global variable set by PHP
+  const initialSettings: Settings = (window as any).__ACFOIL_SETTINGS__ || {
+    activeProvider: 'heroicons',
+    pinnedVersion: 'latest',
+    palette: [
+      { token: 'A', label: 'Primary', hex: '#18181b' },
+      { token: 'B', label: 'Secondary', hex: '#71717a' },
+      { token: 'C', label: 'Accent', hex: '#4f46e5' },
+    ],
+    defaultToken: 'A',
+  };
+
+  // Hide the PHP-rendered forms
   const forms = wrap.querySelectorAll('form');
-  const form = forms[0] as HTMLFormElement | null;
-  const purgeForm = (forms[1] as HTMLFormElement) || null;
-  if (!form) {
-    return;
-  }
-  const table = form.querySelector('table.form-table') as HTMLElement | null;
-  if (table) table.style.display = 'none';
-  const existing = wrap.querySelector('.acfoi-settings-ui');
+  forms.forEach((form) => {
+    (form as HTMLElement).style.display = 'none';
+  });
+
+  const existing = wrap.querySelector('.acfoil-settings-ui');
   if (existing) {
     return; // avoid duplicates
   }
-  const mount = document.createElement('div');
-  wrap.insertBefore(mount, form);
-  createRoot(mount).render(<SettingsUI form={form} purgeForm={purgeForm} />);
+
+  const mountEl = document.createElement('div');
+  wrap.appendChild(mountEl);
+  createRoot(mountEl).render(<SettingsUI initialSettings={initialSettings} />);
 }
 
 if (document.readyState === 'loading') {
