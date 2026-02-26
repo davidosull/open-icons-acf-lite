@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Plugin Name: Advanced Custom Fields: Open Icons Lite
+ * Plugin Name: Open Icons Lite for ACF
  * Description: ACF field that lets you use the Heroicons icon set with caching, sanitisation, and stable rendering. Free version with 292+ icons.
  * Version: 1.0.0
  * Author: David O'Sullivan

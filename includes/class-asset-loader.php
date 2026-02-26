@@ -212,14 +212,11 @@ class Asset_Loader {
     wp_register_script('acfoil-vite-client', $vite_url . '/@vite/client', [], (string) time(), false);
     self::ensure_module_script_filter();
 
-    $preamble_tpl = <<<'JS'
-import RefreshRuntime from '%VITE_URL%/@react-refresh';
-RefreshRuntime.injectIntoGlobalHook(window);
-window.$RefreshReg$ = () => {};
-window.$RefreshSig$ = () => (type) => type;
-window.__vite_plugin_react_preamble_installed__ = true;
-JS;
-    $preamble = str_replace('%VITE_URL%', esc_url($vite_url), $preamble_tpl);
+    $preamble = 'import RefreshRuntime from "' . esc_url($vite_url) . '/@react-refresh";'
+      . 'RefreshRuntime.injectIntoGlobalHook(window);'
+      . 'window.$RefreshReg$ = () => {};'
+      . 'window.$RefreshSig$ = () => (type) => type;'
+      . 'window.__vite_plugin_react_preamble_installed__ = true;';
     wp_add_inline_script('acfoil-vite-client', $preamble, 'before');
     wp_enqueue_script('acfoil-vite-client');
   }
