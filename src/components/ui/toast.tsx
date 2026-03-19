@@ -55,7 +55,7 @@ export function useToaster(inlineHost?: HTMLElement | null) {
           key={t.id}
           data-state={(t as any)._removing ? 'closed' : 'open'}
           className={cn(
-            'acfoil-toast',
+            'openicon-toast',
             isInline ? 'w-full' : 'w-[300px] pointer-events-auto',
             'rounded-md border p-4',
             t.type === 'success' && 'bg-emerald-50 border-emerald-200 text-emerald-800',

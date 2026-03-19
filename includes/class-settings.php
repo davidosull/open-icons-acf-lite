@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOIL;
+namespace OPENICON;
 
 if (! defined('ABSPATH')) {
   exit;
@@ -8,37 +8,31 @@ if (! defined('ABSPATH')) {
 
 /**
  * Settings page for ACF Open Icons Lite.
- * Simplified version with upsell messaging and tracking opt-in.
  */
 class Settings {
-  private $option_key = 'acf_open_icons_settings';
+  private $option_key = 'openicon_settings';
   private $providers;
-  private $cache;
-  private $tracking;
 
-  public function __construct(Providers $providers, Cache $cache, ?Tracking $tracking = null) {
+  public function __construct(Providers $providers) {
     $this->providers = $providers;
-    $this->cache     = $cache;
-    $this->tracking  = $tracking;
     add_action('admin_menu', [$this, 'register_menu']);
     add_action('admin_init', [$this, 'register_settings']);
-    add_action('admin_post_acfoil_purge_cache', [$this, 'handle_purge']);
-    add_action('admin_post_acfoil_restore_defaults', [$this, 'handle_restore']);
+    add_action('admin_post_openicon_restore_defaults', [$this, 'handle_restore']);
   }
 
   public function register_menu(): void {
     add_submenu_page(
       'edit.php?post_type=acf-field-group',
-      __('Open Icons', 'acf-open-icons-lite'),
-      __('Open Icons', 'acf-open-icons-lite'),
+      __('Open Icons', 'open-icons-acf'),
+      __('Open Icons', 'open-icons-acf'),
       'manage_options',
-      'acf-open-icons-lite',
+      'open-icons-acf',
       [$this, 'render_page']
     );
   }
 
   public function register_settings(): void {
-    register_setting('acf_open_icons_lite', $this->option_key, [
+    register_setting('openicon_lite', $this->option_key, [
       'sanitize_callback' => [$this, 'sanitize_settings'],
     ]);
   }
@@ -50,16 +44,29 @@ class Settings {
    * @return array Sanitised settings value
    */
   public function sanitize_settings($value): array {
-    // Ensure value is an array
     $value = is_array($value) ? $value : [];
 
-    // Remove the nonce from the value if present
     if (isset($value['__nonce'])) {
       unset($value['__nonce']);
     }
 
-    // Force provider to heroicons (Lite only supports Heroicons)
     $value['activeProvider'] = 'heroicons';
+
+    if (isset($value['palette']) && is_array($value['palette'])) {
+      foreach ($value['palette'] as $i => $item) {
+        $value['palette'][$i]['label'] = sanitize_text_field($item['label'] ?? '');
+        $value['palette'][$i]['hex'] = sanitize_hex_color($item['hex'] ?? '') ?: '#000000';
+        $value['palette'][$i]['token'] = in_array($item['token'] ?? '', ['A', 'B', 'C'], true)
+          ? $item['token'] : '';
+      }
+      $value['palette'] = array_slice($value['palette'], 0, 3);
+    }
+
+    $value['defaultToken'] = in_array($value['defaultToken'] ?? '', ['A', 'B', 'C'], true)
+      ? $value['defaultToken'] : 'A';
+
+    $allowed = ['activeProvider', 'palette', 'defaultToken'];
+    $value = array_intersect_key($value, array_flip($allowed));
 
     return $value;
   }
@@ -67,7 +74,6 @@ class Settings {
   public function get_settings(): array {
     $defaults = [
       'activeProvider' => 'heroicons',
-      'pinnedVersion'  => 'latest',
       'palette'        => [
         ['token' => 'A', 'label' => 'Primary', 'hex' => '#18181b'],
         ['token' => 'B', 'label' => 'Secondary', 'hex' => '#71717a'],
@@ -77,7 +83,6 @@ class Settings {
     ];
     $settings = wp_parse_args(get_option($this->option_key, []), $defaults);
 
-    // Force provider to heroicons for Lite version
     $settings['activeProvider'] = 'heroicons';
 
     return $settings;
@@ -92,47 +97,34 @@ class Settings {
     return 'heroicons';
   }
 
-  public function handle_purge(): void {
-    if (! current_user_can('manage_options')) {
-      wp_die('forbidden');
-    }
-    check_admin_referer('acfoil_admin');
-    $this->cache->purge_all();
-    wp_safe_redirect(add_query_arg(['page' => 'acf-open-icons-lite', 'purged' => 1], admin_url('edit.php?post_type=acf-field-group')));
-    exit;
-  }
-
   public function handle_restore(): void {
     if (! current_user_can('manage_options')) {
       wp_die('forbidden');
     }
-    check_admin_referer('acfoil_admin');
+    check_admin_referer('openicon_admin');
     delete_option($this->option_key);
-    wp_safe_redirect(add_query_arg(['page' => 'acf-open-icons-lite', 'restored' => 1], admin_url('edit.php?post_type=acf-field-group')));
+    wp_safe_redirect(add_query_arg(['page' => 'open-icons-acf', 'restored' => 1], admin_url('edit.php?post_type=acf-field-group')));
     exit;
   }
 
   public function render_page(): void {
     $settings  = $this->get_settings();
     $providers = $this->providers->all();
-    $premium_providers = $this->providers->get_premium_providers();
-    $tracking_status = $this->tracking ? $this->tracking->get_status() : ['enabled' => false];
 ?>
     <div class="wrap">
-      <h1><?php echo esc_html__('Open Icons Settings', 'acf-open-icons-lite'); ?></h1>
+      <h1><?php echo esc_html__('Open Icons Settings', 'open-icons-acf'); ?></h1>
 
       <?php
       // The React UI will mount here and replace the native form
-      // The form is needed for React to find and mount the UI
       ?>
       <form method="post" action="options.php" style="margin-bottom:16px; display:none;">
-        <?php settings_fields('acf_open_icons_lite'); ?>
-        <input type="hidden" name="<?php echo esc_attr($this->option_key); ?>[__nonce]" value="<?php echo esc_attr(wp_create_nonce('acfoil_admin')); ?>" />
+        <?php settings_fields('openicon_lite'); ?>
+        <input type="hidden" name="<?php echo esc_attr($this->option_key); ?>[__nonce]" value="<?php echo esc_attr(wp_create_nonce('openicon_admin')); ?>" />
         <input type="hidden" name="<?php echo esc_attr($this->option_key); ?>[activeProvider]" value="heroicons" />
 
         <table class="form-table" role="presentation" style="display:none;">
           <tr>
-            <th scope="row"><?php esc_html_e('Icon Set', 'acf-open-icons-lite'); ?></th>
+            <th scope="row"><?php esc_html_e('Icon Set', 'open-icons-acf'); ?></th>
             <td>
               <select name="<?php echo esc_attr($this->option_key); ?>[activeProvider]" disabled>
                 <?php foreach ($providers as $key => $meta) : ?>
@@ -142,7 +134,7 @@ class Settings {
             </td>
           </tr>
           <tr>
-            <th scope="row"><?php esc_html_e('Palette colours', 'acf-open-icons-lite'); ?></th>
+            <th scope="row"><?php esc_html_e('Palette colours', 'open-icons-acf'); ?></th>
             <td>
               <?php foreach (['A', 'B', 'C'] as $i => $t) : $item = $settings['palette'][$i] ?? null; ?>
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
@@ -153,7 +145,7 @@ class Settings {
                 </div>
               <?php endforeach; ?>
               <div style="margin-top:8px;">
-                <label><?php esc_html_e('Default palette token', 'acf-open-icons-lite'); ?></label>
+                <label><?php esc_html_e('Default palette token', 'open-icons-acf'); ?></label>
                 <select name="<?php echo esc_attr($this->option_key); ?>[defaultToken]">
                   <?php foreach (['A', 'B', 'C'] as $t) : ?>
                     <option value="<?php echo esc_attr($t); ?>" <?php selected($settings['defaultToken'], $t); ?>><?php echo esc_html($t); ?></option>
@@ -167,25 +159,11 @@ class Settings {
       </form>
 
       <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:none;">
-        <?php wp_nonce_field('acfoil_admin'); ?>
-        <input type="hidden" name="action" value="acfoil_purge_cache" />
-        <?php submit_button(__('Purge Icon Cache', 'acf-open-icons-lite'), 'secondary'); ?>
-      </form>
-      <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:none;">
-        <?php wp_nonce_field('acfoil_admin'); ?>
-        <input type="hidden" name="action" value="acfoil_restore_defaults" />
-        <?php submit_button(__('Restore Defaults', 'acf-open-icons-lite'), 'delete'); ?>
+        <?php wp_nonce_field('openicon_admin'); ?>
+        <input type="hidden" name="action" value="openicon_restore_defaults" />
+        <?php submit_button(__('Restore Defaults', 'open-icons-acf'), 'delete'); ?>
       </form>
     </div>
 <?php
-  }
-
-  /**
-   * Get tracking instance.
-   *
-   * @return Tracking|null
-   */
-  public function get_tracking(): ?Tracking {
-    return $this->tracking;
   }
 }

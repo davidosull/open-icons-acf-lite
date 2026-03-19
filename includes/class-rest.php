@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOIL;
+namespace OPENICON;
 
 if (! defined('ABSPATH')) {
   exit;
@@ -8,12 +8,12 @@ if (! defined('ABSPATH')) {
 
 /**
  * REST API endpoints for ACF Open Icons Lite.
- * Simplified version without migration or license endpoints.
+ * All icons are bundled locally — no remote fetching.
  */
 class Rest {
   private $providers;
   private $cache;
-  private $ns = 'acf-open-icons/v1';
+  private $ns = 'openicon/v1';
 
   public function __construct(Providers $providers, Cache $cache) {
     $this->providers = $providers;
@@ -25,43 +25,24 @@ class Rest {
     register_rest_route($this->ns, '/icon', [
       'methods'  => 'GET',
       'callback' => [$this, 'get_icon'],
-      'permission_callback' => '__return_true',
+      'permission_callback' => function () {
+        return current_user_can('edit_posts');
+      },
     ]);
 
     register_rest_route($this->ns, '/manifest', [
       'methods'  => 'GET',
       'callback' => [$this, 'get_manifest'],
-      'permission_callback' => '__return_true',
+      'permission_callback' => function () {
+        return current_user_can('edit_posts');
+      },
     ]);
 
     register_rest_route($this->ns, '/bundle', [
       'methods'  => 'GET',
       'callback' => [$this, 'get_bundle'],
-      'permission_callback' => '__return_true',
-    ]);
-
-    register_rest_route($this->ns, '/cache/purge', [
-      'methods'  => 'POST',
-      'callback' => [$this, 'purge_cache'],
       'permission_callback' => function () {
-        return current_user_can('manage_options');
-      },
-    ]);
-
-    // Tracking endpoint
-    register_rest_route($this->ns, '/tracking', [
-      'methods'  => 'GET',
-      'callback' => [$this, 'get_tracking_status'],
-      'permission_callback' => function () {
-        return current_user_can('manage_options');
-      },
-    ]);
-
-    register_rest_route($this->ns, '/tracking/toggle', [
-      'methods'  => 'POST',
-      'callback' => [$this, 'toggle_tracking'],
-      'permission_callback' => function () {
-        return current_user_can('manage_options');
+        return current_user_can('edit_posts');
       },
     ]);
 
@@ -87,24 +68,23 @@ class Rest {
     $version  = sanitize_text_field((string) $req->get_param('version'));
     $key      = $this->sanitize_icon_key((string) $req->get_param('key'));
 
-    // Lite version only supports heroicons
     if ($provider !== 'heroicons') {
       $provider = 'heroicons';
     }
 
     if (! $this->providers->get($provider) || empty($key)) {
-      return new \WP_Error('acfoil_bad_request', __('Invalid provider or key.', 'acf-open-icons-lite'), ['status' => 400]);
+      return new \WP_Error('openicon_bad_request', __('Invalid provider or key.', 'open-icons-acf'), ['status' => 400]);
     }
 
     $svg = $this->cache->get_svg($provider, $version ?: 'latest', $key);
     if (! $svg) {
-      return new \WP_Error('acfoil_not_found', __('Icon not found.', 'acf-open-icons-lite'), ['status' => 404]);
+      return new \WP_Error('openicon_not_found', __('Icon not found.', 'open-icons-acf'), ['status' => 404]);
     }
 
     status_header(200);
     header('Content-Type: image/svg+xml; charset=UTF-8');
     header('Cache-Control: public, max-age=31536000');
-    echo wp_kses($svg, acfoil_get_allowed_svg_tags());
+    echo wp_kses($svg, openicon_get_allowed_svg_tags());
     exit;
   }
 
@@ -116,24 +96,8 @@ class Rest {
   }
 
   public function get_manifest(\WP_REST_Request $req) {
-    $provider = sanitize_key((string) $req->get_param('provider'));
-    $version  = sanitize_text_field((string) $req->get_param('version')) ?: 'latest';
-    $search   = sanitize_text_field((string) $req->get_param('q'));
-
-    // Lite version only supports heroicons
-    if ($provider !== 'heroicons') {
-      $provider = 'heroicons';
-    }
-
-    $cache_key = 'acfoil_manifest_' . md5($provider . '|' . $version);
-    $icons = get_transient($cache_key);
-
-    if (! is_array($icons)) {
-      $icons = $this->fetch_manifest($provider, $version);
-      if (is_array($icons)) {
-        set_transient($cache_key, $icons, HOUR_IN_SECONDS * 12);
-      }
-    }
+    $search = sanitize_text_field((string) $req->get_param('q'));
+    $icons  = $this->cache->get_manifest();
 
     if ($search) {
       $icons = array_values(array_filter($icons, function ($k) use ($search) {
@@ -144,149 +108,64 @@ class Rest {
     return ['icons' => $icons];
   }
 
-  public function fetch_manifest(string $provider, string $version): array {
-    $icons = [];
-
-    // Lite version only supports heroicons
-    if ($provider === 'heroicons') {
-      $meta_url = 'https://unpkg.com/heroicons@' . rawurlencode($version) . '/?meta';
-      $response = wp_remote_get($meta_url, ['timeout' => 20]);
-      if (! is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        if (isset($data['files']) && is_array($data['files'])) {
-          foreach ($data['files'] as $file) {
-            if (isset($file['path']) && strpos($file['path'], '24/outline/') !== false && substr($file['path'], -4) === '.svg') {
-              $icons[] = basename($file['path'], '.svg');
-            }
-          }
-        }
-      }
-    }
-
-    sort($icons, SORT_STRING);
-    return $icons;
-  }
-
   public function get_bundle(\WP_REST_Request $req) {
     $provider = sanitize_key((string) $req->get_param('provider'));
     $version  = sanitize_text_field((string) $req->get_param('version')) ?: 'latest';
     $keys     = (string) $req->get_param('keys');
     $keys_arr = array_filter(array_map([$this, 'sanitize_icon_key'], explode(',', $keys)));
 
-    // Lite version only supports heroicons
     if ($provider !== 'heroicons') {
       $provider = 'heroicons';
     }
 
     $out = [];
-
-    // First, check cache for all icons
     foreach ($keys_arr as $k) {
-      $file = $this->cache->path_for($provider, $version, $k);
-      if (file_exists($file)) {
-        $svg = file_get_contents($file);
-        if (strpos($svg, '\\"') !== false) {
-          $svg = str_replace('\\"', '"', $svg);
-          file_put_contents($file, $svg);
-        }
-        if ($svg) {
-          $out[] = ['key' => $k, 'svg' => $svg];
-        }
-      } else {
-        // Fetch missing icons
-        $fetched = $this->cache->fetch_and_store($provider, $version, $k);
-        if ($fetched) {
-          $out[] = ['key' => $k, 'svg' => $fetched];
-        }
+      $svg = $this->cache->get_svg($provider, $version, $k);
+      if ($svg) {
+        $out[] = ['key' => $k, 'svg' => $svg];
       }
     }
 
     return ['items' => $out];
   }
 
-  public function purge_cache(\WP_REST_Request $req) {
-    $provider = sanitize_key((string) $req->get_param('provider'));
-    $version  = sanitize_text_field((string) $req->get_param('version'));
-
-    if ($provider !== 'heroicons') {
-      $provider = 'heroicons';
-    }
-
-    if (! $version) {
-      return new \WP_Error('acfoil_bad_request', __('Invalid version.', 'acf-open-icons-lite'), ['status' => 400]);
-    }
-
-    $this->cache->purge($provider, $version);
-    return ['ok' => true];
-  }
-
-  /**
-   * Get tracking status.
-   */
-  public function get_tracking_status(\WP_REST_Request $req) {
-    $tracking = new Tracking();
-    return $tracking->get_status();
-  }
-
-  /**
-   * Toggle tracking on/off.
-   */
-  public function toggle_tracking(\WP_REST_Request $req) {
-    $enable = (bool) $req->get_param('enable');
-    $tracking = new Tracking();
-
-    if ($enable) {
-      $tracking->enable();
-    } else {
-      $tracking->disable();
-    }
-
-    return [
-      'success' => true,
-      'enabled' => $tracking->is_enabled(),
-    ];
-  }
-
   /**
    * Save settings via REST.
    */
   public function save_settings(\WP_REST_Request $req) {
-    $settings = $req->get_json_params();
+    $input = $req->get_json_params();
 
-    if (! is_array($settings)) {
-      return new \WP_Error('acfoil_bad_request', __('Invalid settings data.', 'acf-open-icons-lite'), ['status' => 400]);
+    if (! is_array($input)) {
+      return new \WP_Error('openicon_bad_request', __('Invalid settings data.', 'open-icons-acf'), ['status' => 400]);
     }
 
-    // Force provider to heroicons (Lite only supports Heroicons)
+    $settings = [];
+
     $settings['activeProvider'] = 'heroicons';
 
-    // Sanitize palette
-    if (isset($settings['palette']) && is_array($settings['palette'])) {
-      foreach ($settings['palette'] as $i => $item) {
-        if (isset($item['label'])) {
-          $settings['palette'][$i]['label'] = sanitize_text_field($item['label']);
+    if (isset($input['palette']) && is_array($input['palette'])) {
+      $palette = [];
+      foreach (array_slice($input['palette'], 0, 3) as $item) {
+        if (! is_array($item)) {
+          continue;
         }
-        if (isset($item['hex'])) {
-          $settings['palette'][$i]['hex'] = sanitize_hex_color($item['hex']) ?: '#000000';
-        }
-        if (isset($item['token'])) {
-          $settings['palette'][$i]['token'] = sanitize_text_field($item['token']);
-        }
+        $palette[] = [
+          'label' => sanitize_text_field($item['label'] ?? ''),
+          'hex'   => sanitize_hex_color($item['hex'] ?? '') ?: '#000000',
+          'token' => in_array($item['token'] ?? '', ['A', 'B', 'C'], true) ? $item['token'] : '',
+        ];
       }
+      $settings['palette'] = $palette;
     }
 
-    // Sanitize defaultToken
-    if (isset($settings['defaultToken'])) {
-      $settings['defaultToken'] = in_array($settings['defaultToken'], ['A', 'B', 'C'], true)
-        ? $settings['defaultToken']
-        : 'A';
-    }
+    $settings['defaultToken'] = in_array($input['defaultToken'] ?? '', ['A', 'B', 'C'], true)
+      ? $input['defaultToken']
+      : 'A';
 
-    update_option('acf_open_icons_settings', $settings);
+    update_option('openicon_settings', $settings);
 
     return [
-      'success' => true,
+      'success'  => true,
       'settings' => $settings,
     ];
   }
@@ -295,11 +174,10 @@ class Rest {
    * Restore default settings via REST.
    */
   public function restore_defaults(\WP_REST_Request $req) {
-    delete_option('acf_open_icons_settings');
+    delete_option('openicon_settings');
 
     $defaults = [
       'activeProvider' => 'heroicons',
-      'pinnedVersion'  => 'latest',
       'palette'        => [
         ['token' => 'A', 'label' => 'Primary', 'hex' => '#18181b'],
         ['token' => 'B', 'label' => 'Secondary', 'hex' => '#71717a'],

@@ -9,7 +9,7 @@ if (! defined('ABSPATH')) {
  *
  * @return array Allowed tags and attributes.
  */
-function acfoil_get_allowed_svg_tags() {
+function openicon_get_allowed_svg_tags() {
   return [
     'svg' => [
       'xmlns'       => true,
@@ -115,7 +115,7 @@ function acfoil_get_allowed_svg_tags() {
  *                              @type bool   $echo  Whether to echo or return. Default true.
  * @return string|void SVG markup if $echo is false, otherwise echoes.
  */
-function acfoil_open_icon($value = null, $atts = []) {
+function openicon_open_icon($value = null, $atts = []) {
   // Backwards compatibility: detect if first param is an array with 'value' key
   if (is_array($value) && isset($value['value']) && ! isset($value['svg']) && ! isset($value['iconKey'])) {
     // Old API: acf_open_icon(['value' => $icon_field, 'size' => 32])
@@ -169,21 +169,25 @@ function acfoil_open_icon($value = null, $atts = []) {
   } elseif (! empty($value['colorToken']) && ! empty($value['provider']) && ! empty($iconKey)) {
     // Fallback: If no stored SVG but we have colorToken, fetch from cache and apply colour
     // This handles edge cases where SVG wasn't stored
-    $providers = new \ACFOIL\Providers();
-    $sanitiser = new \ACFOIL\Sanitiser();
-    $cache     = new \ACFOIL\Cache($providers, $sanitiser);
+    $providers = new \OPENICON\Providers();
+    $cache     = new \OPENICON\Cache($providers);
 
     $provider = sanitize_key($value['provider']);
     $version  = sanitize_text_field($value['version'] ?? 'latest');
     $iconKey  = sanitize_title_with_dashes($iconKey);
 
-    // Fetch original SVG from cache (without colour applied)
+    // Lite only supports heroicons — fall back if stored provider isn't available
+    if (! $providers->get($provider)) {
+      $provider = 'heroicons';
+    }
+
+    // Fetch original SVG from bundled icons
     $svg = $cache->get_svg($provider, $version, $iconKey);
 
     if ($svg) {
       // Get current colour from settings based on token (unless override provided)
       if (empty($atts['color'])) {
-        $settings = get_option('acf_open_icons_settings', []);
+        $settings = get_option('openicon_settings', []);
         $palette  = $settings['palette'] ?? [];
         if (is_array($palette)) {
           foreach ($palette as $item) {
@@ -290,28 +294,12 @@ function acfoil_open_icon($value = null, $atts = []) {
   }
 
   // Sanitize SVG for safe output using wp_kses with allowed SVG tags
-  $svg = wp_kses($svg, acfoil_get_allowed_svg_tags());
+  $svg = wp_kses($svg, openicon_get_allowed_svg_tags());
 
   if ($atts['echo']) {
     // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Output is sanitized by wp_kses above
     echo $svg;
   } else {
     return $svg;
-  }
-}
-
-/**
- * Backward-compatible alias for acfoil_open_icon.
- *
- * @deprecated Use acfoil_open_icon() instead.
- * @see acfoil_open_icon()
- *
- * @param array|string $value ACF field value.
- * @param array        $atts  Display arguments.
- * @return string|void
- */
-if (! function_exists('acf_open_icon')) {
-  function acf_open_icon($value = null, $atts = []) {
-    return acfoil_open_icon($value, $atts);
   }
 }

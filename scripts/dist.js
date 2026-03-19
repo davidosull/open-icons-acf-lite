@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
 const buildsDir = join(rootDir, 'builds');
-const pluginName = 'acf-open-icons-lite';
+const pluginName = 'open-icons-acf';
 
 // Read version from package.json
 const packageJson = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));
@@ -16,9 +16,9 @@ const version = packageJson.version;
 
 console.log(`Building distribution packages for version ${version}...`);
 
-// Sync version to acf-open-icons-lite.php
-console.log('Syncing version to acf-open-icons-lite.php...');
-const pluginFile = join(rootDir, 'acf-open-icons-lite.php');
+// Sync version to open-icons-acf.php
+console.log('Syncing version to open-icons-acf.php...');
+const pluginFile = join(rootDir, 'open-icons-acf.php');
 let pluginContent = readFileSync(pluginFile, 'utf8');
 pluginContent = pluginContent.replace(/Version:\s*[\d.]+/, `Version: ${version}`);
 writeFileSync(pluginFile, pluginContent);
@@ -57,7 +57,6 @@ const excludePatterns = [
 ];
 
 // Files to always exclude (applied to all builds including production)
-// Note: Hidden files (starting with .) are automatically excluded by shouldExclude()
 const alwaysExclude = [
   '.DS_Store',
   '.gitignore',
@@ -69,9 +68,10 @@ const alwaysExclude = [
 
 // Production files for WordPress.org submission
 const productionFiles = [
-  'acf-open-icons-lite.php',
+  'open-icons-acf.php',
   'includes',
   'assets',
+  'src',
   'readme.txt',
   'LICENSE',
 ];
@@ -82,13 +82,10 @@ function shouldExclude(filePath, patterns) {
   const parts = normalizedPath.split('/');
   const fileName = parts[parts.length - 1];
 
-  // Exclude all hidden files/folders (starting with .)
-  // WordPress.org does not permit hidden files or folders
   if (fileName.startsWith('.')) {
     return true;
   }
 
-  // Always exclude files in the alwaysExclude list
   if (alwaysExclude.some(exc => parts.some(part => part === exc))) {
     return true;
   }
@@ -121,12 +118,10 @@ function copyRecursive(src, dest, includeList = null, excludeList = []) {
       const destPath = join(dest, entry);
       const relativePath = relative(rootDir, srcPath).replace(/\\/g, '/');
 
-      // Always check exclusions (includes hidden files and alwaysExclude list)
       if (shouldExclude(relativePath, excludeList)) {
         continue;
       }
 
-      // If includeList provided, only include matching files
       if (includeList) {
         const shouldInclude = includeList.some(inc => {
           if (relativePath === inc || relativePath.startsWith(inc + '/')) {
@@ -144,12 +139,10 @@ function copyRecursive(src, dest, includeList = null, excludeList = []) {
   } else {
     const relativePath = relative(rootDir, src).replace(/\\/g, '/');
 
-    // Always check exclusions (includes hidden files and alwaysExclude list)
     if (shouldExclude(relativePath, excludeList)) {
       return;
     }
 
-    // If includeList provided, only include matching files
     if (includeList) {
       const shouldInclude = includeList.some(inc => {
         if (relativePath === inc || relativePath.startsWith(inc + '/')) {
@@ -162,7 +155,6 @@ function copyRecursive(src, dest, includeList = null, excludeList = []) {
       }
     }
 
-    // Ensure destination directory exists
     const destDir = dirname(dest);
     if (!existsSync(destDir)) {
       mkdirSync(destDir, { recursive: true });
@@ -202,7 +194,7 @@ await createZip(pluginStageDir, sourceZipPath, pluginName);
 // Clean up staging directory
 rmSync(stageDir, { recursive: true, force: true });
 
-console.log('\n✅ Distribution packages created successfully!');
+console.log('\nDistribution packages created successfully!');
 console.log(`  - ${pluginName}-${version}.zip (production)`);
 console.log(`  - ${pluginName}-latest.zip (production)`);
 console.log(`  - ${pluginName}-${version}-src.zip (source)`);
@@ -218,7 +210,6 @@ function createZip(sourceDir, zipPath, entryName) {
 
     archive.pipe(output);
 
-    // Add all files from sourceDir, but prefix with entryName
     archive.directory(sourceDir, entryName, false);
     archive.finalize();
   });

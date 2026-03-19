@@ -11,7 +11,7 @@ const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
   ({ className, value, onChange, ...props }, ref) => {
     return (
       <input
-        data-acfoil-colorpicker
+        data-openicon-colorpicker
         type='color'
         value={value}
         onChange={onChange}

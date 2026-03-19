@@ -1,31 +1,31 @@
 {
   "_select-menu-!~{003}~.js": {
-    "file": "select-menu-BjcREeyc.css",
+    "file": "select-menu-D5JEtbmt.css",
     "src": "_select-menu-!~{003}~.js"
   },
-  "_select-menu-DnhtV_6-.js": {
-    "file": "select-menu-DnhtV_6-.js",
+  "_select-menu-DPXFltX0.js": {
+    "file": "select-menu-DPXFltX0.js",
     "name": "select-menu",
     "css": [
-      "select-menu-BjcREeyc.css"
+      "select-menu-D5JEtbmt.css"
     ]
   },
   "src/picker.tsx": {
-    "file": "picker-BfMVFlDN.js",
+    "file": "picker-C1xoGBb7.js",
     "name": "picker",
     "src": "src/picker.tsx",
     "isEntry": true,
     "imports": [
-      "_select-menu-DnhtV_6-.js"
+      "_select-menu-DPXFltX0.js"
     ]
   },
   "src/settings.tsx": {
-    "file": "settings-Cetim6rf.js",
+    "file": "settings-BylxllX7.js",
     "name": "settings",
     "src": "src/settings.tsx",
     "isEntry": true,
     "imports": [
-      "_select-menu-DnhtV_6-.js"
+      "_select-menu-DPXFltX0.js"
     ]
   }
 }

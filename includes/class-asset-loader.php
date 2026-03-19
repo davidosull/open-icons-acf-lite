@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOIL;
+namespace OPENICON;
 
 if (! defined('ABSPATH')) {
   exit;
@@ -14,17 +14,17 @@ class Asset_Loader {
   private static $module_script_filters_added = false;
   private static $dev_mode_cache = null;
   private static $working_dev_host = null;
-  private const DEFAULT_DEV_HEALTH_PATH = '/_acfoil-dev-health';
-  private const DEV_HEALTH_HEADER = 'x-acfoil-dev-server';
-  private const DEV_HEALTH_HEADER_VALUE = 'acf-open-icons-lite';
-  private const DEV_HEALTH_SIGNATURE = 'acfoil:dev:ok';
+  private const DEFAULT_DEV_HEALTH_PATH = '/_openicon-dev-health';
+  private const DEV_HEALTH_HEADER = 'x-openicon-dev-server';
+  private const DEV_HEALTH_HEADER_VALUE = 'open-icons-acf';
+  private const DEV_HEALTH_SIGNATURE = 'openicon:dev:ok';
 
   private static function get_dev_config(): array {
-    $scheme = defined('ACFOIL_DEV_SERVER_SCHEME') ? (string) ACFOIL_DEV_SERVER_SCHEME : 'http';
-    $host = defined('ACFOIL_DEV_SERVER_HOST') ? (string) ACFOIL_DEV_SERVER_HOST : '127.0.0.1';
-    $port = defined('ACFOIL_DEV_SERVER_PORT') ? (int) ACFOIL_DEV_SERVER_PORT : 5174;
+    $scheme = defined('OPENICON_DEV_SERVER_SCHEME') ? (string) OPENICON_DEV_SERVER_SCHEME : 'http';
+    $host = defined('OPENICON_DEV_SERVER_HOST') ? (string) OPENICON_DEV_SERVER_HOST : '127.0.0.1';
+    $port = defined('OPENICON_DEV_SERVER_PORT') ? (int) OPENICON_DEV_SERVER_PORT : 5174;
 
-    $config = apply_filters('acfoil_dev_server_config', [
+    $config = apply_filters('openicon_dev_server_config', [
       'scheme' => in_array(strtolower(trim($scheme)), ['http', 'https'], true) ? strtolower(trim($scheme)) : 'http',
       'host' => trim($host) ?: '127.0.0.1',
       'port' => $port > 0 ? $port : 5174,
@@ -119,7 +119,7 @@ class Asset_Loader {
     }
 
     // Manual override via .dev file
-    if (file_exists(ACFOIL_PLUGIN_DIR . '.dev')) {
+    if (file_exists(OPENICON_PLUGIN_DIR . '.dev')) {
       $config = self::get_dev_config();
       $working_host = self::try_hosts($config['port'], 0.5);
       if ($working_host) {
@@ -129,7 +129,7 @@ class Asset_Loader {
           self::$working_dev_host = $working_host;
         }
       }
-      $result = (bool) apply_filters('acfoil_is_dev_mode', true, ['reason' => 'dot_dev_flag']);
+      $result = (bool) apply_filters('openicon_is_dev_mode', true, ['reason' => 'dot_dev_flag']);
       self::$dev_mode_cache = $result;
       return $result;
     }
@@ -139,7 +139,7 @@ class Asset_Loader {
     $working_host = self::try_hosts($config['port']);
 
     if (! $working_host) {
-      $result = (bool) apply_filters('acfoil_is_dev_mode', false, ['reason' => 'port_closed']);
+      $result = (bool) apply_filters('openicon_is_dev_mode', false, ['reason' => 'port_closed']);
       self::$dev_mode_cache = $result;
       return $result;
     }
@@ -149,7 +149,7 @@ class Asset_Loader {
       self::$working_dev_host = $working_host;
     }
 
-    $result = (bool) apply_filters('acfoil_is_dev_mode', $health['ok'], [
+    $result = (bool) apply_filters('openicon_is_dev_mode', $health['ok'], [
       'reason' => $health['ok'] ? 'health_check_passed' : 'health_check_failed',
       'error' => $health['error'] ?? null,
     ]);
@@ -196,7 +196,7 @@ class Asset_Loader {
     }
 
     add_filter('script_loader_tag', function ($tag, $handle) {
-      if (in_array($handle, ['acfoil-picker', 'acfoil-settings', 'acfoil-vite-client'], true)) {
+      if (in_array($handle, ['openicon-picker', 'openicon-settings', 'openicon-vite-client'], true)) {
         $tag = preg_replace('/type=["\'][^"\']*["\']\s*/', '', $tag);
         return str_replace('<script ', '<script type="module" ', $tag);
       }
@@ -209,7 +209,7 @@ class Asset_Loader {
   private static function enqueue_vite_client_with_preamble(): void {
     $vite_url = self::get_vite_server_url();
 
-    wp_register_script('acfoil-vite-client', $vite_url . '/@vite/client', [], (string) time(), false);
+    wp_register_script('openicon-vite-client', $vite_url . '/@vite/client', [], (string) time(), false);
     self::ensure_module_script_filter();
 
     $preamble = 'import RefreshRuntime from "' . esc_url($vite_url) . '/@react-refresh";'
@@ -217,12 +217,12 @@ class Asset_Loader {
       . 'window.$RefreshReg$ = () => {};'
       . 'window.$RefreshSig$ = () => (type) => type;'
       . 'window.__vite_plugin_react_preamble_installed__ = true;';
-    wp_add_inline_script('acfoil-vite-client', $preamble, 'before');
-    wp_enqueue_script('acfoil-vite-client');
+    wp_add_inline_script('openicon-vite-client', $preamble, 'before');
+    wp_enqueue_script('openicon-vite-client');
   }
 
   public static function enqueue_picker_assets(): void {
-    $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
+    $settings = (new Settings(new Providers()))->get_settings();
     $provider = 'heroicons';
 
     $libraryUrl = 'https://heroicons.com';
@@ -231,23 +231,26 @@ class Asset_Loader {
       self::enqueue_vite_client_with_preamble();
 
       wp_enqueue_script(
-        'acfoil-picker',
+        'openicon-picker',
         self::get_vite_server_url() . '/src/picker.tsx',
-        ['acfoil-vite-client'],
+        ['openicon-vite-client'],
         time(),
         true
       );
 
       self::ensure_module_script_filter();
 
-      add_action('admin_footer', function () use ($libraryUrl) {
-        $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
-        $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
-        $defaultToken = $settings['defaultToken'] ?? 'A';
-        echo '<script>window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOIL_LITE__ = true;</script>' . "\n";
-      }, 5);
+      $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
+      $defaultToken = $settings['defaultToken'] ?? 'A';
+
+      wp_localize_script('openicon-picker', 'openicon_api', [
+        'root' => esc_url_raw(rest_url()),
+        'nonce' => wp_create_nonce('wp_rest'),
+      ]);
+
+      wp_add_inline_script('openicon-picker', 'window.__OPENICON_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__OPENICON_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__OPENICON_LITE__ = true;', 'before');
     } else {
-      $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/manifest.json';
+      $manifest_path = OPENICON_PLUGIN_DIR . 'assets/build/manifest.json';
       $manifest = [];
 
       if (! file_exists($manifest_path)) {
@@ -273,56 +276,54 @@ class Asset_Loader {
       $all_css = self::collect_css_from_manifest($manifest, 'src/picker.tsx');
 
       foreach (array_unique($all_css) as $idx => $css_file) {
-        $handle = $idx === 0 ? 'acfoil-picker' : 'acfoil-picker-' . ($idx + 1);
-        $css_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
-        wp_enqueue_style($handle, $css_url, [], ACFOIL_VERSION);
+        $handle = $idx === 0 ? 'openicon-picker' : 'openicon-picker-' . ($idx + 1);
+        $css_url = OPENICON_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
+        wp_enqueue_style($handle, $css_url, [], OPENICON_VERSION);
       }
 
-      $js_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
-      wp_register_script('acfoil-picker', $js_url, [], ACFOIL_VERSION, true);
+      $js_url = OPENICON_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
+      wp_register_script('openicon-picker', $js_url, [], OPENICON_VERSION, true);
       self::ensure_module_script_filter();
 
-      $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
+      $settings = (new Settings(new Providers()))->get_settings();
       $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
       $defaultToken = $settings['defaultToken'] ?? 'A';
 
-      wp_add_inline_script('acfoil-picker', 'window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOIL_LITE__ = true;', 'before');
-      wp_enqueue_script('acfoil-picker');
+      wp_localize_script('openicon-picker', 'openicon_api', [
+        'root' => esc_url_raw(rest_url()),
+        'nonce' => wp_create_nonce('wp_rest'),
+      ]);
+
+      wp_add_inline_script('openicon-picker', 'window.__OPENICON_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__OPENICON_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__OPENICON_LITE__ = true;', 'before');
+      wp_enqueue_script('openicon-picker');
     }
   }
 
   public static function enqueue_settings_assets(): void {
-    $settings = (new Settings(new Providers(), new Cache(new Providers(), new Sanitiser())))->get_settings();
+    $settings = (new Settings(new Providers()))->get_settings();
     $palette  = isset($settings['palette']) && is_array($settings['palette']) ? array_values($settings['palette']) : [];
     $defaultToken = $settings['defaultToken'] ?? 'A';
     $libraryUrl = 'https://heroicons.com';
 
-    // Get tracking status
-    $tracking = new Tracking();
-    $trackingStatus = $tracking->get_status();
-
-    add_action('admin_head', function () use ($settings, $trackingStatus) {
-      echo '<script>window.wpApiSettings = window.wpApiSettings || ' . wp_json_encode([
-        'root' => esc_url_raw(rest_url()),
-        'nonce' => wp_create_nonce('wp_rest'),
-      ]) . '; window.__ACFOIL_TRACKING__ = ' . wp_json_encode($trackingStatus) . '; window.__ACFOIL_SETTINGS__ = ' . wp_json_encode($settings) . ';</script>' . "\n";
-    }, 1);
-
     if (self::is_dev_mode()) {
       self::enqueue_vite_client_with_preamble();
       wp_enqueue_script(
-        'acfoil-settings',
+        'openicon-settings',
         self::get_vite_server_url() . '/src/settings.tsx',
-        ['acfoil-vite-client'],
+        ['openicon-vite-client'],
         time(),
         true
       );
       self::ensure_module_script_filter();
-      add_action('admin_footer', function () use ($palette, $defaultToken, $libraryUrl) {
-        echo '<script>window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOIL_LITE__ = true;</script>' . "\n";
-      }, 5);
+
+      wp_localize_script('openicon-settings', 'openicon_api', [
+        'root' => esc_url_raw(rest_url()),
+        'nonce' => wp_create_nonce('wp_rest'),
+      ]);
+
+      wp_add_inline_script('openicon-settings', 'window.__OPENICON_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__OPENICON_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__OPENICON_LITE__ = true; window.__OPENICON_SETTINGS__ = ' . wp_json_encode($settings) . ';', 'before');
     } else {
-      $manifest_path = ACFOIL_PLUGIN_DIR . 'assets/build/manifest.json';
+      $manifest_path = OPENICON_PLUGIN_DIR . 'assets/build/manifest.json';
       $manifest = [];
 
       if (! file_exists($manifest_path)) {
@@ -348,22 +349,22 @@ class Asset_Loader {
       $all_css = self::collect_css_from_manifest($manifest, 'src/settings.tsx');
 
       foreach (array_unique($all_css) as $idx => $css_file) {
-        $handle = $idx === 0 ? 'acfoil-settings' : 'acfoil-settings-' . ($idx + 1);
-        $css_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
-        wp_enqueue_style($handle, $css_url, [], ACFOIL_VERSION);
+        $handle = $idx === 0 ? 'openicon-settings' : 'openicon-settings-' . ($idx + 1);
+        $css_url = OPENICON_PLUGIN_URL . 'assets/build/' . ltrim($css_file, '/');
+        wp_enqueue_style($handle, $css_url, [], OPENICON_VERSION);
       }
 
-      $js_url = ACFOIL_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
-      wp_register_script('acfoil-settings', $js_url, [], ACFOIL_VERSION, true);
+      $js_url = OPENICON_PLUGIN_URL . 'assets/build/' . ltrim($entry['file'], '/');
+      wp_register_script('openicon-settings', $js_url, [], OPENICON_VERSION, true);
       self::ensure_module_script_filter();
 
-      wp_localize_script('acfoil-settings', 'wpApiSettings', [
+      wp_localize_script('openicon-settings', 'openicon_api', [
         'root' => esc_url_raw(rest_url()),
         'nonce' => wp_create_nonce('wp_rest'),
       ]);
 
-      wp_add_inline_script('acfoil-settings', 'window.__ACFOIL_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__ACFOIL_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__ACFOIL_LITE__ = true; window.__ACFOIL_TRACKING__ = ' . wp_json_encode($trackingStatus) . '; window.__ACFOIL_SETTINGS__ = ' . wp_json_encode($settings) . ';', 'before');
-      wp_enqueue_script('acfoil-settings');
+      wp_add_inline_script('openicon-settings', 'window.__OPENICON_PALETTE__ = ' . wp_json_encode(['items' => $palette, 'default' => $defaultToken]) . '; window.__OPENICON_LIBRARY__ = { url: ' . wp_json_encode($libraryUrl) . ', name: "Heroicons" }; window.__OPENICON_LITE__ = true; window.__OPENICON_SETTINGS__ = ' . wp_json_encode($settings) . ';', 'before');
+      wp_enqueue_script('openicon-settings');
     }
   }
 }

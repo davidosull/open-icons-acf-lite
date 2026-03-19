@@ -2,21 +2,21 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-const acfoilDevHealthPlugin = () => ({
-  name: 'acfoil-dev-health-endpoint',
+const openiconDevHealthPlugin = () => ({
+  name: 'openicon-dev-health-endpoint',
   configureServer(server) {
     server.middlewares.use((req, res, next) => {
       if (! req.url || req.method !== 'GET') {
         return next();
       }
 
-      if (req.url.startsWith('/_acfoil-dev-health')) {
+      if (req.url.startsWith('/_openicon-dev-health')) {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
-        res.setHeader('X-ACFOIL-Dev-Server', 'acf-open-icons-lite');
+        res.setHeader('x-openicon-dev-server', 'open-icons-acf');
         res.end(JSON.stringify({
           status: 'ok',
-          signature: 'acfoil:dev:ok',
+          signature: 'openicon:dev:ok',
         }));
         return;
       }
@@ -30,13 +30,13 @@ const acfoilDevHealthPlugin = () => ({
         return next();
       }
 
-      if (req.url.startsWith('/_acfoil-dev-health')) {
+      if (req.url.startsWith('/_openicon-dev-health')) {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
-        res.setHeader('X-ACFOIL-Dev-Server', 'acf-open-icons-lite');
+        res.setHeader('x-openicon-dev-server', 'open-icons-acf');
         res.end(JSON.stringify({
           status: 'ok',
-          signature: 'acfoil:dev:ok',
+          signature: 'openicon:dev:ok',
         }));
         return;
       }
@@ -51,7 +51,7 @@ export default defineConfig({
     react({
       jsxRuntime: 'automatic',
     }),
-    acfoilDevHealthPlugin(),
+    openiconDevHealthPlugin(),
   ],
   build: {
     outDir: 'assets/build',
@@ -59,7 +59,7 @@ export default defineConfig({
     manifest: 'manifest.json',
     assetsDir: '',
     sourcemap: false,
-    minify: 'esbuild',
+    minify: false,
     rollupOptions: {
       input: {
         picker: resolve(__dirname, 'src/picker.tsx'),

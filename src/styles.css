@@ -13,19 +13,19 @@
 
 /* Restore WordPress admin link colors that Tailwind resets */
 /* Exclude links inside our settings UI that have explicit styling */
-.wrap a:not(.acfoil-settings-ui a),
+.wrap a:not(.openicon-settings-ui a),
 .notice a,
 .acf-fields a {
   color: #2271b1;
 }
-.wrap a:hover:not(.acfoil-settings-ui a:hover),
+.wrap a:hover:not(.openicon-settings-ui a:hover),
 .notice a:hover,
 .acf-fields a:hover {
   color: #135e96;
 }
 
 /* Ensure WP admin doesn't override our custom color input */
-input[data-acfoil-colorpicker] {
+input[data-openicon-colorpicker] {
   @apply h-10 w-20 rounded-md border border-zinc-300 bg-white p-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
   appearance: none;
   -webkit-appearance: none;
@@ -33,18 +33,18 @@ input[data-acfoil-colorpicker] {
 }
 
 /* Toast animations */
-.acfoil-toast {
+.openicon-toast {
   animation-fill-mode: both;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   will-change: opacity, transform;
 }
 
-.acfoil-toast[data-state='open'] {
+.openicon-toast[data-state='open'] {
   animation-name: toastEnter;
   animation-duration: 0.3s;
 }
 
-.acfoil-toast[data-state='closed'] {
+.openicon-toast[data-state='closed'] {
   animation-name: toastExit;
   animation-duration: 0.2s;
 }

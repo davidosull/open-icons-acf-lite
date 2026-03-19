@@ -48,65 +48,19 @@ function SettingsUI({ initialSettings }: { initialSettings: Settings }) {
   const [cHex, setCHex] = React.useState(initialSettings.palette[2]?.hex || '#4f46e5');
   const [def, setDef] = React.useState(initialSettings.defaultToken || 'A');
 
-  // Tracking state
-  const trackingStatus = (window as any).__ACFOIL_TRACKING__ || {
-    enabled: false,
-  };
-  const [trackingEnabled, setTrackingEnabled] = React.useState(
-    trackingStatus.enabled
-  );
-  const [togglingTracking, setTogglingTracking] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
-  const [purging, setPurging] = React.useState(false);
   const [restoring, setRestoring] = React.useState(false);
 
   const restBase =
-    (window as any).wpApiSettings?.root?.replace(/\/$/, '') || '/wp-json';
-  const nonce = (window as any).wpApiSettings?.nonce || '';
-  const apiBase = `${restBase}/acf-open-icons/v1`;
+    (window as any).openicon_api?.root?.replace(/\/$/, '') || '/wp-json';
+  const nonce = (window as any).openicon_api?.nonce || '';
+  const apiBase = `${restBase}/openicon/v1`;
 
   // Premium provider info for upsell
   const premiumProviders = [
     { key: 'lucide', label: 'Lucide Icons', count: '1,500+' },
     { key: 'tabler', label: 'Tabler Icons', count: '5,200+' },
   ];
-
-  // Toggle tracking
-  const handleToggleTracking = React.useCallback(async () => {
-    setTogglingTracking(true);
-    try {
-      const response = await fetch(`${apiBase}/tracking/toggle`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-WP-Nonce': nonce,
-        },
-        body: JSON.stringify({ enable: !trackingEnabled }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setTrackingEnabled(data.enabled);
-        push({
-          type: 'success',
-          title: data.enabled ? 'Tracking Enabled' : 'Tracking Disabled',
-          message: data.enabled
-            ? 'Thank you for helping improve ACF Open Icons Lite!'
-            : 'Usage tracking has been disabled.',
-        });
-      }
-    } catch {
-      push({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to update tracking preferences.',
-      });
-    } finally {
-      setTogglingTracking(false);
-    }
-  }, [trackingEnabled, apiBase, nonce, push]);
 
   // Save settings
   const handleSave = React.useCallback(async () => {
@@ -157,44 +111,6 @@ function SettingsUI({ initialSettings }: { initialSettings: Settings }) {
     }
   }, [aLabel, aHex, bLabel, bHex, cLabel, cHex, def, apiBase, nonce, push]);
 
-  // Purge cache
-  const handlePurge = React.useCallback(async () => {
-    setPurging(true);
-    try {
-      const response = await withMinDelay(
-        fetch(`${apiBase}/cache/purge`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-WP-Nonce': nonce,
-          },
-          body: JSON.stringify({ provider: 'heroicons', version: 'latest' }),
-        })
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.ok) {
-        push({
-          type: 'success',
-          title: 'Cache',
-          message: 'Icon cache purged.',
-        });
-      } else {
-        throw new Error('Failed to purge');
-      }
-    } catch {
-      push({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to purge cache.',
-      });
-    } finally {
-      setPurging(false);
-    }
-  }, [apiBase, nonce, push]);
-
   // Restore defaults
   const handleRestore = React.useCallback(async () => {
     setRestoring(true);
@@ -244,7 +160,7 @@ function SettingsUI({ initialSettings }: { initialSettings: Settings }) {
   const controlClass = 'max-w-[520px]';
 
   return (
-    <div className='acfoil-settings-ui mt-3'>
+    <div className='openicon-settings-ui mt-3'>
       {portal}
       <div className='space-y-6 max-w-[576px]'>
         {/* Upgrade Banner */}
@@ -382,45 +298,6 @@ function SettingsUI({ initialSettings }: { initialSettings: Settings }) {
           </div>
         </div>
 
-        {/* Usage Tracking */}
-        <div className='rounded-md border bg-white p-4'>
-          <div className='grid gap-3'>
-            <div className='grid grid-cols-[180px_1fr] items-center gap-3'>
-              <Label>Usage Tracking</Label>
-            </div>
-            <div className='grid grid-cols-[180px_1fr] items-start gap-3'>
-              <span className='text-sm text-muted-foreground'>
-                Share usage data
-              </span>
-              <div className='flex items-start gap-3'>
-                <button
-                  type='button'
-                  role='switch'
-                  aria-checked={trackingEnabled}
-                  onClick={handleToggleTracking}
-                  disabled={togglingTracking}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                    trackingEnabled ? 'bg-emerald-500' : 'bg-zinc-200'
-                  } ${togglingTracking ? 'opacity-50 cursor-wait' : ''}`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      trackingEnabled ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-                <span className='text-sm text-muted-foreground'>
-                  {trackingEnabled ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-            </div>
-            <p className='text-xs text-zinc-400 col-span-full'>
-              We collect: a hashed site URL, WordPress version, PHP version, and
-              plugin version. No personal data is ever collected.
-            </p>
-          </div>
-        </div>
-
         {/* Action Buttons */}
         <div className='flex items-center gap-3'>
           <Button
@@ -430,14 +307,6 @@ function SettingsUI({ initialSettings }: { initialSettings: Settings }) {
           >
             <span className={saving ? 'invisible' : ''}>Save Changes</span>
             {saving && <span className='absolute'>Saving...</span>}
-          </Button>
-          <Button
-            onClick={handlePurge}
-            variant='secondary'
-            disabled={purging}
-          >
-            <span className={purging ? 'invisible' : ''}>Purge Icon Cache</span>
-            {purging && <span className='absolute'>Purging...</span>}
           </Button>
           <Button
             onClick={handleRestore}
@@ -464,7 +333,7 @@ function mount() {
   }
 
   // Get initial settings from the global variable set by PHP
-  const initialSettings: Settings = (window as any).__ACFOIL_SETTINGS__ || {
+  const initialSettings: Settings = (window as any).__OPENICON_SETTINGS__ || {
     activeProvider: 'heroicons',
     pinnedVersion: 'latest',
     palette: [
@@ -481,7 +350,7 @@ function mount() {
     (form as HTMLElement).style.display = 'none';
   });
 
-  const existing = wrap.querySelector('.acfoil-settings-ui');
+  const existing = wrap.querySelector('.openicon-settings-ui');
   if (existing) {
     return; // avoid duplicates
   }

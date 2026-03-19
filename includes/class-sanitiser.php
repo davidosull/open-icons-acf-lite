@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOIL;
+namespace OPENICON;
 
 if (! defined('ABSPATH')) {
   exit;

@@ -1,0 +1,16 @@
+.git
+.github
+.dev
+.claude
+node_modules
+scripts/
+builds/
+postcss.config.cjs
+tailwind.config.js
+tsconfig.json
+vite.config.js
+package.json
+package-lock.json
+.distignore
+.gitignore
+*.map

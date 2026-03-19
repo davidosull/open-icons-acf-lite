@@ -1,6 +1,6 @@
 <?php
 
-namespace ACFOIL;
+namespace OPENICON;
 
 if (! defined('ABSPATH')) {
   exit;
@@ -21,7 +21,7 @@ class ACF_Field_Open_Icons extends \acf_field {
 
   public function __construct(Providers $providers, Cache $cache, Sanitiser $sanitiser) {
     $this->name     = 'open_icons';
-    $this->label    = __('Open Icons', 'acf-open-icons-lite');
+    $this->label    = __('Open Icons', 'open-icons-acf');
     $this->category = 'content';
     $this->defaults = [
       'use_last_color' => 1,
@@ -35,8 +35,8 @@ class ACF_Field_Open_Icons extends \acf_field {
 
   public function render_field_settings($field) {
     acf_render_field_setting($field, [
-      'label'        => __('Use Last Colour', 'acf-open-icons-lite'),
-      'instructions' => __('When enabled, subsequent icon selections in the same context (repeater/flexible layout) will use the last selected colour.', 'acf-open-icons-lite'),
+      'label'        => __('Use Last Colour', 'open-icons-acf'),
+      'instructions' => __('When enabled, subsequent icon selections in the same context (repeater/flexible layout) will use the last selected colour.', 'open-icons-acf'),
       'name'         => 'use_last_color',
       'type'         => 'true_false',
       'ui'           => 1,
@@ -45,23 +45,20 @@ class ACF_Field_Open_Icons extends \acf_field {
   }
 
   public function render_field($field) {
-    $settings = wp_parse_args(get_option('acf_open_icons_settings', []), [
+    $settings = wp_parse_args(get_option('openicon_settings', []), [
       'activeProvider' => 'heroicons',
-      'pinnedVersion'  => 'latest',
     ]);
 
-    // Lite version always uses heroicons
     $settings['activeProvider'] = 'heroicons';
 
     $value   = is_array($field['value'] ?? null) ? $field['value'] : [];
     $stored  = $value['svg'] ?? '';
     $refKey  = esc_attr($value['iconKey'] ?? '');
 
-    // For the picker modal, always use heroicons
     $pickerProv = 'heroicons';
-    $pickerVer  = esc_attr($settings['pinnedVersion']);
+    $pickerVer  = 'latest';
     $refProv = esc_attr((!empty($refKey) && isset($value['provider'])) ? $value['provider'] : 'heroicons');
-    $refVer  = esc_attr((!empty($refKey) && isset($value['version'])) ? $value['version'] : $settings['pinnedVersion']);
+    $refVer  = esc_attr((!empty($refKey) && isset($value['version'])) ? $value['version'] : 'latest');
 
     // If we have a colorToken, regenerate the SVG with current palette colour
     // This ensures the preview shows the current colour even if the stored SVG has old colour
@@ -107,7 +104,7 @@ class ACF_Field_Open_Icons extends \acf_field {
       }
     }
     $field_name = esc_attr($field['name']);
-    $instance_id = uniqid('acfoil_', false);
+    $instance_id = uniqid('openicon_', false);
     $has_icon = !empty($refKey) && !empty($stored);
     $use_last_color = !empty($field['use_last_color']) ? '1' : '0';
 
@@ -138,55 +135,30 @@ class ACF_Field_Open_Icons extends \acf_field {
     // Field key for context identification
     $field_key = esc_attr($field['key'] ?? '');
 ?>
-    <div class="acfoil-field" id="<?php echo esc_attr($instance_id); ?>"
-      data-acfoil-provider="<?php echo esc_attr($pickerProv); ?>"
-      data-acfoil-version="<?php echo esc_attr($pickerVer); ?>"
-      data-acfoil-instance-id="<?php echo esc_attr($instance_id); ?>"
-      data-acfoil-use-last-color="<?php echo esc_attr($use_last_color); ?>"
-      data-acfoil-field-key="<?php echo esc_attr($field_key); ?>"
-      data-acfoil-field-group-key="<?php echo esc_attr($field_group_key); ?>"
-      data-acfoil-picker-blocked="0">
-      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[provider]" value="<?php echo esc_attr($refProv); ?>" data-acfoil-provider-out />
-      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[version]" value="<?php echo esc_attr($refVer); ?>" data-acfoil-version-out />
-      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[iconKey]" value="<?php echo esc_attr($refKey); ?>" data-acfoil-key-out />
-      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[colorToken]" value="<?php echo esc_attr($value['colorToken'] ?? ''); ?>" data-acfoil-color-token-out />
-      <textarea class="acf-hidden" name="<?php echo esc_attr($field_name); ?>[svg]" data-acfoil-svg-out><?php echo esc_textarea($stored); ?></textarea>
+    <div class="openicon-field" id="<?php echo esc_attr($instance_id); ?>"
+      data-openicon-provider="<?php echo esc_attr($pickerProv); ?>"
+      data-openicon-version="<?php echo esc_attr($pickerVer); ?>"
+      data-openicon-instance-id="<?php echo esc_attr($instance_id); ?>"
+      data-openicon-use-last-color="<?php echo esc_attr($use_last_color); ?>"
+      data-openicon-field-key="<?php echo esc_attr($field_key); ?>"
+      data-openicon-field-group-key="<?php echo esc_attr($field_group_key); ?>"
+      data-openicon-picker-blocked="0">
+      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[provider]" value="<?php echo esc_attr($refProv); ?>" data-openicon-provider-out />
+      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[version]" value="<?php echo esc_attr($refVer); ?>" data-openicon-version-out />
+      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[iconKey]" value="<?php echo esc_attr($refKey); ?>" data-openicon-key-out />
+      <input type="hidden" name="<?php echo esc_attr($field_name); ?>[colorToken]" value="<?php echo esc_attr($value['colorToken'] ?? ''); ?>" data-openicon-color-token-out />
+      <textarea class="acf-hidden" name="<?php echo esc_attr($field_name); ?>[svg]" data-openicon-svg-out><?php echo esc_textarea($stored); ?></textarea>
 
-      <div class="acfoil-preview-wrap" style="display:flex;align-items:center;gap:12px;">
-        <div class="acfoil-preview" style="width:40px;height:40px;border:1px solid #ddd;border-radius:4px;display:flex;align-items:center;justify-content:center;background:#fff;line-height:0;<?php echo $has_icon ? '' : 'display:none;'; ?>" title="<?php esc_attr_e('Click to change icon', 'acf-open-icons-lite'); ?>" data-acfoil-preview>
-          <?php echo $has_icon ? wp_kses($stored, acfoil_get_allowed_svg_tags()) : ''; ?>
+      <div class="openicon-preview-wrap" style="display:flex;align-items:center;gap:12px;">
+        <div class="openicon-preview" style="width:40px;height:40px;border:1px solid #ddd;border-radius:4px;display:flex;align-items:center;justify-content:center;background:#fff;line-height:0;<?php echo $has_icon ? '' : 'display:none;'; ?>" title="<?php esc_attr_e('Click to change icon', 'open-icons-acf'); ?>" data-openicon-preview>
+          <?php echo $has_icon ? wp_kses($stored, openicon_get_allowed_svg_tags()) : ''; ?>
         </div>
-        <div class="acfoil-actions" style="display:flex;gap:8px;">
-          <button class="button button-primary acfoil-select-button" type="button" data-acfoil-open><?php echo $has_icon ? esc_html__('Change Icon', 'acf-open-icons-lite') : esc_html__('Select Icon', 'acf-open-icons-lite'); ?></button>
-          <button class="button" type="button" data-acfoil-clear style="<?php echo $has_icon ? '' : 'display:none;'; ?>"><?php esc_html_e('Remove', 'acf-open-icons-lite'); ?></button>
+        <div class="openicon-actions" style="display:flex;gap:8px;">
+          <button class="button button-primary openicon-select-button" type="button" data-openicon-open><?php echo $has_icon ? esc_html__('Change Icon', 'open-icons-acf') : esc_html__('Select Icon', 'open-icons-acf'); ?></button>
+          <button class="button" type="button" data-openicon-clear style="<?php echo $has_icon ? '' : 'display:none;'; ?>"><?php esc_html_e('Remove', 'open-icons-acf'); ?></button>
         </div>
       </div>
     </div>
-    <script>
-      (function() {
-        const root = document.getElementById('<?php echo esc_js($instance_id); ?>');
-        const clearBtn = root.querySelector('[data-acfoil-clear]');
-        const openBtn = root.querySelector('[data-acfoil-open]');
-
-        function clear() {
-          root.querySelector('[data-acfoil-key-out]').value = '';
-          root.querySelector('[data-acfoil-svg-out]').value = '';
-          const tokenInput = root.querySelector('[data-acfoil-color-token-out]');
-          if (tokenInput) tokenInput.value = '';
-          const preview = root.querySelector('[data-acfoil-preview]');
-          if (preview) {
-            preview.innerHTML = '';
-            preview.style.display = 'none';
-          }
-          if (openBtn) {
-            openBtn.style.display = '';
-            openBtn.textContent = '<?php echo esc_js(__('Select Icon', 'acf-open-icons-lite')); ?>';
-          }
-          if (clearBtn) clearBtn.style.display = 'none';
-        }
-        clearBtn && clearBtn.addEventListener('click', clear);
-      })();
-    </script>
 <?php
   }
 
