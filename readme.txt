@@ -1,6 +1,8 @@
 === Open Icons for ACF (Lite) ===
 Contributors: davidbuilds
 Tags: acf, icons, svg, heroicons, custom fields
+Author URI: https://inovomedia.co.uk
+Plugin URI: https://acfopenicons.com
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
@@ -19,21 +21,21 @@ Open Icons for ACF (Lite) adds a custom field type to Advanced Custom Fields (AC
 * **324 Heroicons** - Beautiful, hand-crafted SVG icons by the makers of Tailwind CSS
 * **Color palette** - Define up to 3 color tokens and apply them to icons
 * **Bundled locally** - All icons are included in the plugin, no external requests needed
-* **Clean output** - Simple `openicon_open_icon()` helper function for displaying icons
+* **Clean output** - Simple `get_openicon()` helper function for displaying icons
 * **Sanitised SVGs** - All icons are sanitised for security
 
 **How it works:**
 
 1. Add an "Open Icons" field to your ACF field group
 2. Select an icon and color from the beautiful picker interface
-3. Display the icon in your theme using the `openicon_open_icon()` function
+3. Display the icon in your theme using the `get_openicon()` function
 
 **Display icons in your theme:**
 
 `php
 <?php
 $icon = get_field('your_icon_field');
-openicon_open_icon($icon, ['size' => 24, 'class' => 'my-icon']);
+get_openicon($icon, ['size' => 24, 'class' => 'my-icon']);
 ?>
 `
 
@@ -43,6 +45,7 @@ openicon_open_icon($icon, ['size' => 24, 'class' => 'my-icon']);
 
 * **Lucide Icons** - 1,500+ icons
 * **Tabler Icons** - 5,200+ icons
+* **Custom Icons** - Add your own set of icons
 * Icon migration tools when switching providers
 * Priority support
 
@@ -69,11 +72,11 @@ No. The plugin will automatically prevent you from activating both versions simu
 
 = How do I display an icon in my theme? =
 
-Use the `openicon_open_icon()` function:
+Use the `get_openicon()` function:
 
 `php
 $icon = get_field('icon');
-openicon_open_icon($icon, ['size' => 24, 'class' => 'my-icon']);
+get_openicon($icon, ['size' => 24, 'class' => 'my-icon']);
 `
 
 = Can I change the icon color dynamically? =
@@ -81,7 +84,7 @@ openicon_open_icon($icon, ['size' => 24, 'class' => 'my-icon']);
 Yes! Pass a `color` parameter:
 
 `php
-openicon_open_icon($icon, ['color' => '#ff0000']);
+get_openicon($icon, ['color' => '#ff0000']);
 `
 
 = What icons are included? =
@@ -112,4 +115,5 @@ This will bundle the Heroicons SVGs into `assets/icons/` and compile the TypeScr
 == Changelog ==
 
 = 1.0.0 =
-Initial release of Open Icons for ACF (Lite).
+* Initial release of Open Icons for ACF (Lite).
+* **Breaking:** Renamed public helper function from `openicon_open_icon()` to `get_openicon()`. Update any theme templates that reference the old function name.

@@ -2,6 +2,7 @@
 
 /**
  * Plugin Name: Open Icons for ACF (Lite)
+ * Plugin URI:  https://acfopenicons.com
  * Description: ACF field that lets you use the Heroicons icon set with sanitisation and stable rendering. Free version with 300+ icons.
  * Version: 1.0.0
  * Author: David O'Sullivan

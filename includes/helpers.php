@@ -115,7 +115,7 @@ function openicon_get_allowed_svg_tags() {
  *                              @type bool   $echo  Whether to echo or return. Default true.
  * @return string|void SVG markup if $echo is false, otherwise echoes.
  */
-function openicon_open_icon($value = null, $atts = []) {
+function get_openicon($value = null, $atts = []) {
   // Backwards compatibility: detect if first param is an array with 'value' key
   if (is_array($value) && isset($value['value']) && ! isset($value['svg']) && ! isset($value['iconKey'])) {
     // Old API: acf_open_icon(['value' => $icon_field, 'size' => 32])
