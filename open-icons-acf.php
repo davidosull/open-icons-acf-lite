@@ -27,13 +27,22 @@ function openicon_activation_check() {
     include_once ABSPATH . 'wp-admin/includes/plugin.php';
   }
 
-  if (is_plugin_active('acf-open-icons/acf-open-icons.php')) {
-    deactivate_plugins(plugin_basename(__FILE__));
-    wp_die(
-      esc_html__('Open Icons for ACF (Lite) cannot be activated while ACF Open Icons (Premium) is active. Please deactivate the Premium version first.', 'open-icons-acf'),
-      esc_html__('Plugin Activation Error', 'open-icons-acf'),
-      ['back_link' => true]
-    );
+  // Check for both new and old Pro plugin slugs
+  $pro_slugs = [
+    'open-icons-acf/open-icons-acf.php',
+    'open-icons-acf/acf-open-icons.php',
+    'acf-open-icons/acf-open-icons.php',
+  ];
+
+  foreach ($pro_slugs as $pro_slug) {
+    if (is_plugin_active($pro_slug)) {
+      deactivate_plugins(plugin_basename(__FILE__));
+      wp_die(
+        esc_html__('Open Icons for ACF (Lite) cannot be activated while Open Icons for ACF (Pro) is active. Please deactivate the Pro version first.', 'open-icons-acf'),
+        esc_html__('Plugin Activation Error', 'open-icons-acf'),
+        ['back_link' => true]
+      );
+    }
   }
 }
 register_activation_hook(__FILE__, 'openicon_activation_check');
@@ -43,7 +52,8 @@ register_activation_hook(__FILE__, 'openicon_activation_check');
  * If Premium version is somehow active alongside Lite, deactivate Lite and show notice.
  */
 function openicon_runtime_conflict_check() {
-  if (defined('ACFOI_PLUGIN_FILE')) {
+  // Check for new Pro constant, new Pro flag, or old Pro constant
+  if (defined('OPENICON_PRO_PLUGIN_FILE') || defined('OPENICON_PRO') || defined('ACFOI_PLUGIN_FILE')) {
     if (! function_exists('deactivate_plugins')) {
       require_once ABSPATH . 'wp-admin/includes/plugin.php';
     }
@@ -52,7 +62,7 @@ function openicon_runtime_conflict_check() {
 
     add_action('admin_notices', function () {
       echo '<div class="notice notice-error"><p>';
-      echo esc_html__('Open Icons for ACF (Lite) has been deactivated because ACF Open Icons (Premium) is active. Only one version can be active at a time.', 'open-icons-acf');
+      echo esc_html__('Open Icons for ACF (Lite) has been deactivated because Open Icons for ACF (Pro) is active. Only one version can be active at a time.', 'open-icons-acf');
       echo '</p></div>';
     });
 
