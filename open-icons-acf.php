@@ -4,7 +4,7 @@
  * Plugin Name: Open Icons for ACF (Lite)
  * Plugin URI:  https://acfopenicons.com
  * Description: ACF field that lets you use the Heroicons icon set with sanitisation and stable rendering. Free version with 300+ icons.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: David O'Sullivan
  * Author URI: https://inovomedia.co.uk
  * License: GPL v2 or later
@@ -80,7 +80,7 @@ add_action('plugins_loaded', function () {
   define('OPENICON_PLUGIN_FILE', __FILE__);
   define('OPENICON_PLUGIN_DIR', plugin_dir_path(__FILE__));
   define('OPENICON_PLUGIN_URL', plugin_dir_url(__FILE__));
-  define('OPENICON_VERSION', '1.0.0');
+  define('OPENICON_VERSION', '1.0.1');
 
   spl_autoload_register(function ($class) {
     if (strpos($class, 'OPENICON\\') !== 0) {

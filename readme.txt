@@ -6,7 +6,7 @@ Plugin URI: https://acfopenicons.com
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -113,6 +113,10 @@ This will bundle the Heroicons SVGs into `assets/icons/` and compile the TypeScr
 3. Settings page with color palette configuration
 
 == Changelog ==
+
+= 1.0.1 =
+* Compatibility update for Pro migration release.
+* Added explicit conflict detection support for renamed Pro plugin paths and constants.
 
 = 1.0.0 =
 * Initial release of Open Icons for ACF (Lite).
