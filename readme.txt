@@ -6,7 +6,7 @@ Plugin URI: https://acfopenicons.com
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -113,6 +113,12 @@ This will bundle the Heroicons SVGs into `assets/icons/` and compile the TypeScr
 3. Settings page with color palette configuration
 
 == Changelog ==
+
+= 1.0.2 =
+* Improved icon picker browsing with a search-first layout and a dedicated "Browse all icons" action.
+* Added a "Common Icons" section that learns from usage frequency and recency to surface frequently selected icons.
+* Upgraded picker rendering with virtualised grid loading for smoother performance when browsing large icon lists.
+* Improved keyboard and scroll behaviour across recent, common, and full icon lists.
 
 = 1.0.1 =
 * Compatibility update for Pro migration release.

@@ -80,6 +80,64 @@ function useRecentIcons(
   return { recent, addRecent };
 }
 
+function useCommonIcons(provider: string, version: string, modalOpen?: boolean) {
+  const storageKey = `openicon_common_${provider}@${version}`;
+  const [usage, setUsage] = React.useState<
+    Record<string, { count: number; lastUsedAt: number }>
+  >({});
+
+  const loadUsage = React.useCallback(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        setUsage({});
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        setUsage(parsed);
+        return;
+      }
+      setUsage({});
+    } catch {
+      setUsage({});
+    }
+  }, [storageKey]);
+
+  React.useEffect(() => {
+    loadUsage();
+  }, [loadUsage]);
+
+  React.useEffect(() => {
+    if (modalOpen) {
+      loadUsage();
+    }
+  }, [modalOpen, loadUsage]);
+
+  const addCommon = React.useCallback(
+    (key: string) => {
+      setUsage((prev) => {
+        const now = Date.now();
+        const existing = prev[key];
+        const next = {
+          ...prev,
+          [key]: {
+            count: (existing?.count || 0) + 1,
+            lastUsedAt: now,
+          },
+        };
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    },
+    [storageKey]
+  );
+
+  return { usage, addCommon };
+}
+
 // Skeleton loader component
 function IconSkeleton() {
   return (
@@ -602,9 +660,12 @@ export default function IconPicker({
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [manifestLoading, setManifestLoading] = React.useState(true);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
-  const gridRef = React.useRef<HTMLDivElement | null>(null);
-  const [visibleRange, setVisibleRange] = React.useState({ start: 0, end: 50 });
+  const mainGridRef = React.useRef<HTMLDivElement | null>(null);
+  const [mainScrollTop, setMainScrollTop] = React.useState(0);
+  const [gridColumns, setGridColumns] = React.useState(8);
+  const [showBrowseAll, setShowBrowseAll] = React.useState(false);
   const { recent, addRecent } = useRecentIcons(provider, version, open);
+  const { usage: commonUsage, addCommon } = useCommonIcons(provider, version, open);
   // Track current icon from the field (read from DOM when modal opens)
   const [currentIconKey, setCurrentIconKey] = React.useState<string | null>(null);
 
@@ -612,7 +673,6 @@ export default function IconPicker({
   const filterStartTimeRef = React.useRef<number | null>(null);
   const skeletonRemovalTimesRef = React.useRef<Map<string, number>>(new Map());
   const modalOpenTimeRef = React.useRef<number | null>(null);
-  const pendingFetchKeysRef = React.useRef<Set<string>>(new Set());
   // Track if activeIdx change was from keyboard (to avoid scrolling on mouse hover)
   const activeIdxFromKeyboardRef = React.useRef<boolean>(false);
 
@@ -727,10 +787,12 @@ export default function IconPicker({
   React.useEffect(() => {
     if (open) {
       modalOpenTimeRef.current = performance.now();
+      setMainScrollTop(0);
     } else {
       setQuery('');
       setDebouncedQuery('');
       setActiveIdx(0);
+      setShowBrowseAll(false);
       if (modalOpenTimeRef.current) {
         modalOpenTimeRef.current = null;
       }
@@ -878,52 +940,52 @@ export default function IconPicker({
     return uniqueFiltered;
   }, [all, debouncedQuery]);
 
-  // Separate recent icons from main list
+  // Separate recent and common icons from main list when not searching.
   const recentInList = React.useMemo(() => {
-    if (debouncedQuery) return []; // Don't show recent when searching
-    // Optimize: use Set for O(1) lookup instead of O(n) includes()
+    if (debouncedQuery) return [];
     const allSet = new Set(all);
-    return recent.filter((key) => allSet.has(key));
+    return recent.filter((key) => allSet.has(key)).slice(0, 8);
   }, [recent, all, debouncedQuery]);
 
-  const mainList = React.useMemo(() => {
-    if (debouncedQuery) return list; // Show all search results
-    // Optimize: use Set for O(1) lookup instead of O(n) includes()
-    const recentSet = new Set(recent);
-    const filtered = list.filter((key) => !recentSet.has(key));
-    return filtered; // Show all icons (virtual scrolling handles performance)
-  }, [list, recent, debouncedQuery]);
+  const commonInList = React.useMemo(() => {
+    if (debouncedQuery) return [];
+    const allSet = new Set(all);
+    const recentSet = new Set(recentInList);
+    return Object.entries(commonUsage)
+      .filter(([key]) => allSet.has(key) && !recentSet.has(key))
+      .sort((a, b) => {
+        const aAgeDays = (Date.now() - a[1].lastUsedAt) / 86400000;
+        const bAgeDays = (Date.now() - b[1].lastUsedAt) / 86400000;
+        const aScore = a[1].count * 0.8 + 5 / (aAgeDays + 1);
+        const bScore = b[1].count * 0.8 + 5 / (bAgeDays + 1);
+        return bScore - aScore;
+      })
+      .map(([key]) => key)
+      .slice(0, 16);
+  }, [all, commonUsage, debouncedQuery, recentInList]);
 
-  // Virtual scrolling: track visible items using Intersection Observer
+  const browseList = React.useMemo(() => {
+    if (debouncedQuery) return list;
+    const hiddenSet = new Set([...recentInList, ...commonInList]);
+    return list.filter((key) => !hiddenSet.has(key));
+  }, [list, debouncedQuery, recentInList, commonInList]);
+
+  const shouldShowBrowseGrid = Boolean(debouncedQuery) || showBrowseAll;
+  const mainList = shouldShowBrowseGrid ? browseList : [];
+
   React.useEffect(() => {
-    if (!open || !gridRef.current) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const idx = parseInt(
-              entry.target.getAttribute('data-index') || '0'
-            );
-            setVisibleRange((prev) => ({
-              start: Math.min(prev.start, idx),
-              end: Math.max(prev.end, idx + 20), // Load 20 items ahead
-            }));
-          }
-        });
-      },
-      {
-        root: gridRef.current,
-        rootMargin: '200px', // Start loading before item is visible
-        threshold: 0,
-      }
-    );
-
-    const items = gridRef.current.querySelectorAll('[data-index]');
-    items.forEach((item) => observer.observe(item));
-
+    if (!open || !mainGridRef.current) return;
+    const node = mainGridRef.current;
+    const recalc = () => {
+      const width = node.clientWidth || 960;
+      const cols = Math.max(4, Math.min(10, Math.floor(width / 130)));
+      setGridColumns(cols);
+    };
+    recalc();
+    const observer = new ResizeObserver(() => recalc());
+    observer.observe(node);
     return () => observer.disconnect();
-  }, [open, mainList, recentInList]);
+  }, [open, shouldShowBrowseGrid]);
 
   // Fetch bundle for search results and visible items
   React.useEffect(() => {
@@ -932,25 +994,36 @@ export default function IconPicker({
     // When not searching, only fetch visible items for performance
     const fetchStartTime = performance.now();
 
+    const rowHeight = 124;
+    const viewportHeight = 500;
+    const overscanRows = 3;
+    const startRow = Math.max(
+      0,
+      Math.floor(mainScrollTop / rowHeight) - overscanRows
+    );
+    const endRow = Math.ceil((mainScrollTop + viewportHeight) / rowHeight) + overscanRows;
+    const startIdx = startRow * gridColumns;
+    const endIdx = endRow * gridColumns;
+
     const keysToFetch = debouncedQuery
-      ? mainList.slice(0, 48).filter((k) => !cache[k]) // Only fetch first 48 visible items when searching
+      ? mainList.slice(startIdx, endIdx).filter((k) => !cache[k])
       : [
           ...recentInList.filter((k) => !cache[k]),
-          ...mainList
-            .slice(visibleRange.start, visibleRange.end)
-            .filter((k) => !cache[k]),
+          ...commonInList.filter((k) => !cache[k]),
+          ...mainList.slice(startIdx, endIdx).filter((k) => !cache[k]),
         ];
 
     if (keysToFetch.length === 0) return;
 
     // Track when items start loading (for skeleton removal timing)
     const visibleKeys = debouncedQuery
-      ? mainList.slice(0, 48) // First visible items in search (6x8 grid = 48)
+      ? mainList.slice(startIdx, endIdx)
       : [
           ...recentInList.slice(0, 8),
+          ...commonInList.slice(0, 16),
           ...mainList.slice(
-            visibleRange.start,
-            Math.min(visibleRange.end, visibleRange.start + 40)
+            startIdx,
+            Math.min(endIdx, startIdx + 40)
           ),
         ];
 
@@ -1019,7 +1092,7 @@ export default function IconPicker({
         // When searching, fetch remaining results in background after visible ones load
         if (debouncedQuery && mainList.length > 48) {
           const remaining = mainList
-            .slice(48)
+            .slice(endIdx)
             .filter((k) => !cache[k] && !merged[k])
             .slice(0, 500); // Fetch up to 500 background items (reasonable batch size)
 
@@ -1077,10 +1150,12 @@ export default function IconPicker({
     provider,
     version,
     restBase,
-    visibleRange,
     recentInList,
+    commonInList,
     mainList,
     debouncedQuery,
+    mainScrollTop,
+    gridColumns,
   ]);
 
   React.useEffect(() => {
@@ -1088,7 +1163,7 @@ export default function IconPicker({
     setActiveIdx(0);
     const onKey = (e: KeyboardEvent) => {
       if (!open) return;
-      const totalItems = recentInList.length + mainList.length;
+      const totalItems = recentInList.length + commonInList.length + mainList.length;
       if (e.key === 'Escape') {
         e.preventDefault();
         setOpen(false);
@@ -1109,7 +1184,7 @@ export default function IconPicker({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, mainList, recentInList, activeIdx]);
+  }, [open, mainList, recentInList, commonInList, activeIdx]);
 
   // Scroll active item into view (only for keyboard navigation, not mouse hover)
   React.useEffect(() => {
@@ -1127,13 +1202,22 @@ export default function IconPicker({
     const total = flatList.length;
     if (activeIdx >= total) return;
 
-    const item = gridRef.current?.querySelector(
+    const item = mainGridRef.current?.querySelector(
       `[data-index="${activeIdx}"]`
     ) as HTMLElement;
     if (item) {
       item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return;
     }
-  }, [activeIdx, open, mainList, recentInList]);
+    const mainIdx = activeIdx - recentInList.length;
+    if (mainIdx >= 0 && mainGridRef.current) {
+      const row = Math.floor(mainIdx / gridColumns);
+      mainGridRef.current.scrollTo({
+        top: row * 124,
+        behavior: 'smooth',
+      });
+    }
+  }, [activeIdx, open, mainList, recentInList, commonInList, gridColumns]);
 
   React.useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 0);
@@ -1157,6 +1241,7 @@ export default function IconPicker({
     const cachedSvg = cache[key];
 
     addRecent(key);
+    addCommon(key);
     const color = { token: currentToken, hex: currentColor };
 
     // Close modal FIRST (before calling onSelect) to ensure immediate visual feedback
@@ -1277,10 +1362,22 @@ export default function IconPicker({
     return lum > 0.92; // near-white
   }
 
-  const flatList = [...recentInList, ...mainList];
+  const flatList = [...recentInList, ...commonInList, ...mainList];
   const totalCount = all.length;
   const showingCount = flatList.length;
   const hasMore = showingCount < totalCount;
+  const rowHeight = 124;
+  const totalRows = Math.ceil(mainList.length / gridColumns);
+  const viewportHeight = 500;
+  const overscanRows = 3;
+  const startRow = Math.max(0, Math.floor(mainScrollTop / rowHeight) - overscanRows);
+  const endRow = Math.min(
+    totalRows,
+    Math.ceil((mainScrollTop + viewportHeight) / rowHeight) + overscanRows
+  );
+  const startIdx = startRow * gridColumns;
+  const endIdx = Math.min(mainList.length, endRow * gridColumns);
+  const virtualItems = mainList.slice(startIdx, endIdx);
 
   // Render icon button
   const renderIconButton = (key: string, idx: number, isRecent = false) => {
@@ -1475,6 +1572,12 @@ export default function IconPicker({
                     • <strong>{recentInList.length}</strong> recent
                   </>
                 )}
+                {commonInList.length > 0 && (
+                  <>
+                    {' '}
+                    • <strong>{commonInList.length}</strong> common
+                  </>
+                )}
               </>
             )}
           </div>
@@ -1482,10 +1585,7 @@ export default function IconPicker({
       </div>
 
       <div>
-        <div
-          ref={gridRef}
-          className='max-h-[500px] overflow-auto min-h-[400px]'
-        >
+        <div className='min-h-[500px]'>
           {!debouncedQuery && recentInList.length > 0 && (
             <div className='mb-6'>
               <h3 className='text-sm font-semibold text-zinc-700 mb-3 px-2'>
@@ -1499,17 +1599,57 @@ export default function IconPicker({
             </div>
           )}
 
-          {mainList.length > 0 && (
+          {!debouncedQuery && commonInList.length > 0 && (
+            <div className='mb-6'>
+              <h3 className='text-sm font-semibold text-zinc-700 mb-3 px-2'>
+                Common Icons
+              </h3>
+              <div className='grid grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3 py-2 px-2'>
+                {commonInList.map((key, idx) =>
+                  renderIconButton(key, recentInList.length + idx, false)
+                )}
+              </div>
+            </div>
+          )}
+
+          {!debouncedQuery && !showBrowseAll && (
+            <div className='px-2 py-6 text-center'>
+              <p className='text-sm text-muted-foreground mb-3'>
+                Search for an icon, or browse the full library.
+              </p>
+              <button
+                type='button'
+                className='px-3 py-2 text-sm rounded-md border border-zinc-300 hover:bg-zinc-50 transition-colors'
+                onClick={() => setShowBrowseAll(true)}
+              >
+                Browse all icons
+              </button>
+            </div>
+          )}
+
+          {mainList.length > 0 && shouldShowBrowseGrid && (
             <div>
-              {!debouncedQuery && recentInList.length > 0 && (
+              {!debouncedQuery && (
                 <h3 className='text-sm font-semibold text-zinc-700 mb-3 px-2'>
                   All Icons
                 </h3>
               )}
-              <div className='grid grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3 py-2 px-2'>
-                {mainList.map((key, idx) =>
-                  renderIconButton(key, recentInList.length + idx, false)
-                )}
+              <div
+                ref={mainGridRef}
+                className='max-h-[500px] overflow-auto min-h-[400px]'
+                onScroll={(e) => setMainScrollTop(e.currentTarget.scrollTop)}
+              >
+                <div style={{ height: startRow * rowHeight }} />
+                <div className='grid grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3 py-2 px-2'>
+                  {virtualItems.map((key, idx) =>
+                    renderIconButton(
+                      key,
+                      recentInList.length + commonInList.length + startIdx + idx,
+                      false
+                    )
+                  )}
+                </div>
+                <div style={{ height: Math.max(0, (totalRows - endRow) * rowHeight) }} />
               </div>
             </div>
           )}
