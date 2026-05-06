@@ -82,7 +82,7 @@ get_openicon($icon, ['size' => 24, 'class' => 'my-icon']);
 
 = Can I use Open Icons inside ACF blocks? =
 
-Yes. Register your block as normal with `acf_register_block_type()`, attach an Open Icons field to the block field group, and render it from your block callback or template.
+Yes. Register your block with `acf_register_block_type()`, attach a field group with an Open Icons field (for example `feature_icon`), and render it in your callback.
 
     add_action('acf/init', function () {
         if (! function_exists('acf_register_block_type')) {
@@ -90,18 +90,33 @@ Yes. Register your block as normal with `acf_register_block_type()`, attach an O
         }
 
         acf_register_block_type([
-            'name'            => 'openicon-test',
-            'title'           => 'Open Icon Test',
-            'description'     => 'Temporary block for Open Icons testing',
-            'render_callback' => function () {
-                echo '<div style="padding:12px;border:1px dashed #ccc;">Open Icon Test Block</div>';
-            },
+            'name'            => 'openicon-feature',
+            'title'           => __('Feature with Icon', 'open-icons-acf'),
+            'description'     => __('Feature item with an Open Icons field and text.', 'open-icons-acf'),
+            'render_callback' => 'openicons_render_feature_block',
             'category'        => 'widgets',
             'icon'            => 'star-filled',
-            'keywords'        => ['icon', 'open icon', 'test'],
-            'supports'        => ['jsx' => true],
+            'keywords'        => ['icon', 'feature', 'open icons'],
+            'supports'        => ['align' => ['wide', 'full'], 'anchor' => true, 'jsx' => true],
         ]);
     });
+
+    function openicons_render_feature_block($block): void {
+        $icon  = get_field('feature_icon');
+        $title = (string) (get_field('feature_title') ?: '');
+
+        echo '<article class="oi-feature">';
+
+        if ($icon) {
+            get_openicon($icon, ['size' => 24, 'class' => 'oi-feature__icon']);
+        }
+
+        if ($title !== '') {
+            echo '<h3>' . esc_html($title) . '</h3>';
+        }
+
+        echo '</article>';
+    }
 
 = Can I change the icon color dynamically? =
 
