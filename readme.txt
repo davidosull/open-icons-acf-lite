@@ -22,6 +22,7 @@ Open Icons for ACF (Lite) adds a custom field type to Advanced Custom Fields (AC
 * **Color palette** - Define up to 3 color tokens and apply them to icons
 * **Bundled locally** - All icons are included in the plugin, no external requests needed
 * **Clean output** - Simple `get_openicon()` helper function for displaying icons
+* **ACF block friendly** - Use Open Icons fields inside ACF blocks and Gutenberg workflows
 * **Sanitised SVGs** - All icons are sanitised for security
 
 **How it works:**
@@ -78,6 +79,29 @@ Use the `get_openicon()` function:
 $icon = get_field('icon');
 get_openicon($icon, ['size' => 24, 'class' => 'my-icon']);
 `
+
+= Can I use Open Icons inside ACF blocks? =
+
+Yes. Register your block as normal with `acf_register_block_type()`, attach an Open Icons field to the block field group, and render it from your block callback or template.
+
+    add_action('acf/init', function () {
+        if (! function_exists('acf_register_block_type')) {
+            return;
+        }
+
+        acf_register_block_type([
+            'name'            => 'openicon-test',
+            'title'           => 'Open Icon Test',
+            'description'     => 'Temporary block for Open Icons testing',
+            'render_callback' => function () {
+                echo '<div style="padding:12px;border:1px dashed #ccc;">Open Icon Test Block</div>';
+            },
+            'category'        => 'widgets',
+            'icon'            => 'star-filled',
+            'keywords'        => ['icon', 'open icon', 'test'],
+            'supports'        => ['jsx' => true],
+        ]);
+    });
 
 = Can I change the icon color dynamically? =
 
