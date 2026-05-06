@@ -1,5 +1,5 @@
 var _a, _b, _c, _d, _e, _f;
-import { r as reactExports, j as jsxRuntimeExports, c as cn, a as reactDomExports, I as Input, S as SelectMenu, b as createRoot } from "./select-menu-DPXFltX0.js";
+import { r as reactExports, j as jsxRuntimeExports, c as cn, a as reactDomExports, I as Input, S as SelectMenu, b as createRoot } from "./select-menu-DNLcjW-n.js";
 function DialogContent({
   className,
   children,
@@ -849,6 +849,57 @@ function useRecentIcons(provider, version, modalOpen) {
   );
   return { recent, addRecent };
 }
+function useCommonIcons(provider, version, modalOpen) {
+  const storageKey = `openicon_common_${provider}@${version}`;
+  const [usage, setUsage] = reactExports.useState({});
+  const loadUsage = reactExports.useCallback(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        setUsage({});
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        setUsage(parsed);
+        return;
+      }
+      setUsage({});
+    } catch {
+      setUsage({});
+    }
+  }, [storageKey]);
+  reactExports.useEffect(() => {
+    loadUsage();
+  }, [loadUsage]);
+  reactExports.useEffect(() => {
+    if (modalOpen) {
+      loadUsage();
+    }
+  }, [modalOpen, loadUsage]);
+  const addCommon = reactExports.useCallback(
+    (key) => {
+      setUsage((prev) => {
+        const now = Date.now();
+        const existing = prev[key];
+        const next = {
+          ...prev,
+          [key]: {
+            count: ((existing == null ? void 0 : existing.count) || 0) + 1,
+            lastUsedAt: now
+          }
+        };
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(next));
+        } catch {
+        }
+        return next;
+      });
+    },
+    [storageKey]
+  );
+  return { usage, addCommon };
+}
 function IconSkeleton() {
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col aspect-square items-center justify-center gap-1 rounded-lg p-3 animate-pulse", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-6 h-6 bg-zinc-200 rounded" }),
@@ -1190,14 +1241,16 @@ function IconPicker({
   const [activeIdx, setActiveIdx] = reactExports.useState(0);
   const [manifestLoading, setManifestLoading] = reactExports.useState(true);
   const inputRef = reactExports.useRef(null);
-  const gridRef = reactExports.useRef(null);
-  const [visibleRange, setVisibleRange] = reactExports.useState({ start: 0, end: 50 });
+  const mainGridRef = reactExports.useRef(null);
+  const [mainScrollTop, setMainScrollTop] = reactExports.useState(0);
+  const [gridColumns, setGridColumns] = reactExports.useState(8);
+  const [showBrowseAll, setShowBrowseAll] = reactExports.useState(false);
   const { recent, addRecent } = useRecentIcons(provider, version, open);
+  const { usage: commonUsage, addCommon } = useCommonIcons(provider, version, open);
   const [currentIconKey, setCurrentIconKey] = reactExports.useState(null);
   const filterStartTimeRef = reactExports.useRef(null);
   const skeletonRemovalTimesRef = reactExports.useRef(/* @__PURE__ */ new Map());
   const modalOpenTimeRef = reactExports.useRef(null);
-  reactExports.useRef(/* @__PURE__ */ new Set());
   const activeIdxFromKeyboardRef = reactExports.useRef(false);
   reactExports.useEffect(() => {
     const timer = setTimeout(() => {
@@ -1289,10 +1342,12 @@ function IconPicker({
   reactExports.useEffect(() => {
     if (open) {
       modalOpenTimeRef.current = performance.now();
+      setMainScrollTop(0);
     } else {
       setQuery("");
       setDebouncedQuery("");
       setActiveIdx(0);
+      setShowBrowseAll(false);
       if (modalOpenTimeRef.current) {
         modalOpenTimeRef.current = null;
       }
@@ -1419,55 +1474,65 @@ function IconPicker({
   const recentInList = reactExports.useMemo(() => {
     if (debouncedQuery) return [];
     const allSet = new Set(all);
-    return recent.filter((key) => allSet.has(key));
+    return recent.filter((key) => allSet.has(key)).slice(0, 8);
   }, [recent, all, debouncedQuery]);
-  const mainList = reactExports.useMemo(() => {
+  const commonInList = reactExports.useMemo(() => {
+    if (debouncedQuery) return [];
+    const allSet = new Set(all);
+    const recentSet = new Set(recentInList);
+    return Object.entries(commonUsage).filter(([key]) => allSet.has(key) && !recentSet.has(key)).sort((a, b) => {
+      const aAgeDays = (Date.now() - a[1].lastUsedAt) / 864e5;
+      const bAgeDays = (Date.now() - b[1].lastUsedAt) / 864e5;
+      const aScore = a[1].count * 0.8 + 5 / (aAgeDays + 1);
+      const bScore = b[1].count * 0.8 + 5 / (bAgeDays + 1);
+      return bScore - aScore;
+    }).map(([key]) => key).slice(0, 16);
+  }, [all, commonUsage, debouncedQuery, recentInList]);
+  const browseList = reactExports.useMemo(() => {
     if (debouncedQuery) return list;
-    const recentSet = new Set(recent);
-    const filtered = list.filter((key) => !recentSet.has(key));
-    return filtered;
-  }, [list, recent, debouncedQuery]);
+    const hiddenSet = /* @__PURE__ */ new Set([...recentInList, ...commonInList]);
+    return list.filter((key) => !hiddenSet.has(key));
+  }, [list, debouncedQuery, recentInList, commonInList]);
+  const shouldShowBrowseGrid = Boolean(debouncedQuery) || showBrowseAll;
+  const mainList = shouldShowBrowseGrid ? browseList : [];
   reactExports.useEffect(() => {
-    if (!open || !gridRef.current) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const idx = parseInt(
-              entry.target.getAttribute("data-index") || "0"
-            );
-            setVisibleRange((prev) => ({
-              start: Math.min(prev.start, idx),
-              end: Math.max(prev.end, idx + 20)
-              // Load 20 items ahead
-            }));
-          }
-        });
-      },
-      {
-        root: gridRef.current,
-        rootMargin: "200px",
-        // Start loading before item is visible
-        threshold: 0
-      }
-    );
-    const items = gridRef.current.querySelectorAll("[data-index]");
-    items.forEach((item) => observer.observe(item));
+    if (!open || !mainGridRef.current) return;
+    const node = mainGridRef.current;
+    const recalc = () => {
+      const width = node.clientWidth || 960;
+      const cols = Math.max(4, Math.min(10, Math.floor(width / 130)));
+      setGridColumns(cols);
+    };
+    recalc();
+    const observer = new ResizeObserver(() => recalc());
+    observer.observe(node);
     return () => observer.disconnect();
-  }, [open, mainList, recentInList]);
+  }, [open, shouldShowBrowseGrid]);
   reactExports.useEffect(() => {
     if (!open || list.length === 0) return;
     const fetchStartTime = performance.now();
-    const keysToFetch = debouncedQuery ? mainList.slice(0, 48).filter((k) => !cache[k]) : [
+    const rowHeight2 = 124;
+    const viewportHeight2 = 500;
+    const overscanRows2 = 3;
+    const startRow2 = Math.max(
+      0,
+      Math.floor(mainScrollTop / rowHeight2) - overscanRows2
+    );
+    const endRow2 = Math.ceil((mainScrollTop + viewportHeight2) / rowHeight2) + overscanRows2;
+    const startIdx2 = startRow2 * gridColumns;
+    const endIdx2 = endRow2 * gridColumns;
+    const keysToFetch = debouncedQuery ? mainList.slice(startIdx2, endIdx2).filter((k) => !cache[k]) : [
       ...recentInList.filter((k) => !cache[k]),
-      ...mainList.slice(visibleRange.start, visibleRange.end).filter((k) => !cache[k])
+      ...commonInList.filter((k) => !cache[k]),
+      ...mainList.slice(startIdx2, endIdx2).filter((k) => !cache[k])
     ];
     if (keysToFetch.length === 0) return;
-    const visibleKeys = debouncedQuery ? mainList.slice(0, 48) : [
+    const visibleKeys = debouncedQuery ? mainList.slice(startIdx2, endIdx2) : [
       ...recentInList.slice(0, 8),
+      ...commonInList.slice(0, 16),
       ...mainList.slice(
-        visibleRange.start,
-        Math.min(visibleRange.end, visibleRange.start + 40)
+        startIdx2,
+        Math.min(endIdx2, startIdx2 + 40)
       )
     ];
     visibleKeys.forEach((key) => {
@@ -1519,7 +1584,7 @@ function IconPicker({
         }
         setCache((prev) => ({ ...prev, ...merged }));
         if (debouncedQuery && mainList.length > 48) {
-          const remaining = mainList.slice(48).filter((k) => !cache[k] && !merged[k]).slice(0, 500);
+          const remaining = mainList.slice(endIdx2).filter((k) => !cache[k] && !merged[k]).slice(0, 500);
           if (remaining.length > 0) {
             setTimeout(() => {
               performance.now();
@@ -1570,17 +1635,19 @@ function IconPicker({
     provider,
     version,
     restBase,
-    visibleRange,
     recentInList,
+    commonInList,
     mainList,
-    debouncedQuery
+    debouncedQuery,
+    mainScrollTop,
+    gridColumns
   ]);
   reactExports.useEffect(() => {
     if (!open) return;
     setActiveIdx(0);
     const onKey = (e) => {
       if (!open) return;
-      const totalItems = recentInList.length + mainList.length;
+      const totalItems = recentInList.length + commonInList.length + mainList.length;
       if (e.key === "Escape") {
         e.preventDefault();
         setOpen(false);
@@ -1601,7 +1668,7 @@ function IconPicker({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, mainList, recentInList, activeIdx]);
+  }, [open, mainList, recentInList, commonInList, activeIdx]);
   reactExports.useEffect(() => {
     var _a3;
     if (!open || activeIdx < 0) return;
@@ -1612,13 +1679,22 @@ function IconPicker({
     const flatList2 = [...recentInList, ...mainList];
     const total = flatList2.length;
     if (activeIdx >= total) return;
-    const item = (_a3 = gridRef.current) == null ? void 0 : _a3.querySelector(
+    const item = (_a3 = mainGridRef.current) == null ? void 0 : _a3.querySelector(
       `[data-index="${activeIdx}"]`
     );
     if (item) {
       item.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return;
     }
-  }, [activeIdx, open, mainList, recentInList]);
+    const mainIdx = activeIdx - recentInList.length;
+    if (mainIdx >= 0 && mainGridRef.current) {
+      const row = Math.floor(mainIdx / gridColumns);
+      mainGridRef.current.scrollTo({
+        top: row * 124,
+        behavior: "smooth"
+      });
+    }
+  }, [activeIdx, open, mainList, recentInList, commonInList, gridColumns]);
   reactExports.useEffect(() => {
     if (open) setTimeout(() => {
       var _a3;
@@ -1639,6 +1715,7 @@ function IconPicker({
   async function pick(key) {
     const cachedSvg = cache[key];
     addRecent(key);
+    addCommon(key);
     const color = { token: currentToken, hex: currentColor };
     reactDomExports.flushSync(() => {
       setOpen(false);
@@ -1736,10 +1813,22 @@ function IconPicker({
     const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     return lum > 0.92;
   }
-  const flatList = [...recentInList, ...mainList];
+  const flatList = [...recentInList, ...commonInList, ...mainList];
   const totalCount = all.length;
   const showingCount = flatList.length;
   const hasMore = showingCount < totalCount;
+  const rowHeight = 124;
+  const totalRows = Math.ceil(mainList.length / gridColumns);
+  const viewportHeight = 500;
+  const overscanRows = 3;
+  const startRow = Math.max(0, Math.floor(mainScrollTop / rowHeight) - overscanRows);
+  const endRow = Math.min(
+    totalRows,
+    Math.ceil((mainScrollTop + viewportHeight) / rowHeight) + overscanRows
+  );
+  const startIdx = startRow * gridColumns;
+  const endIdx = Math.min(mainList.length, endRow * gridColumns);
+  const virtualItems = mainList.slice(startIdx, endIdx);
   const renderIconButton = (key, idx, isRecent = false) => {
     const svgRaw = cache[key];
     const svgColored = svgRaw ? applyColorToSvg(svgRaw, currentColor) : "";
@@ -1919,109 +2008,142 @@ function IconPicker({
               "• ",
               /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: recentInList.length }),
               " recent"
+            ] }),
+            commonInList.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+              " ",
+              "• ",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: commonInList.length }),
+              " common"
             ] })
           ] }) })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "div",
-            {
-              ref: gridRef,
-              className: "max-h-[500px] overflow-auto min-h-[400px]",
-              children: [
-                !debouncedQuery && recentInList.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-6", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-semibold text-zinc-700 mb-3 px-2", children: "Recently Used" }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3 py-2 px-2", children: recentInList.map(
-                    (key, idx) => renderIconButton(key, idx, true)
-                  ) })
-                ] }),
-                mainList.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-                  !debouncedQuery && recentInList.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-semibold text-zinc-700 mb-3 px-2", children: "All Icons" }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3 py-2 px-2", children: mainList.map(
-                    (key, idx) => renderIconButton(key, recentInList.length + idx, false)
-                  ) })
-                ] }),
-                manifestLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-16 text-center", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "svg",
-                    {
-                      className: "w-16 h-16 mx-auto text-zinc-300 mb-4 animate-pulse",
-                      fill: "none",
-                      stroke: "currentColor",
-                      viewBox: "0 0 24 24",
-                      children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-                        "path",
-                        {
-                          strokeLinecap: "round",
-                          strokeLinejoin: "round",
-                          strokeWidth: "1.5",
-                          d: "M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                        }
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-h-[500px]", children: [
+            !debouncedQuery && recentInList.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-6", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-semibold text-zinc-700 mb-3 px-2", children: "Recently Used" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3 py-2 px-2", children: recentInList.map(
+                (key, idx) => renderIconButton(key, idx, true)
+              ) })
+            ] }),
+            !debouncedQuery && commonInList.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-6", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-semibold text-zinc-700 mb-3 px-2", children: "Common Icons" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3 py-2 px-2", children: commonInList.map(
+                (key, idx) => renderIconButton(key, recentInList.length + idx, false)
+              ) })
+            ] }),
+            !debouncedQuery && !showBrowseAll && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-2 py-6 text-center", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground mb-3", children: "Search for an icon, or browse the full library." }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "px-3 py-2 text-sm rounded-md border border-zinc-300 hover:bg-zinc-50 transition-colors",
+                  onClick: () => setShowBrowseAll(true),
+                  children: "Browse all icons"
+                }
+              )
+            ] }),
+            mainList.length > 0 && shouldShowBrowseGrid && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              !debouncedQuery && /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-semibold text-zinc-700 mb-3 px-2", children: "All Icons" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "div",
+                {
+                  ref: mainGridRef,
+                  className: "max-h-[500px] overflow-auto min-h-[400px]",
+                  onScroll: (e) => setMainScrollTop(e.currentTarget.scrollTop),
+                  children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: startRow * rowHeight } }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3 py-2 px-2", children: virtualItems.map(
+                      (key, idx) => renderIconButton(
+                        key,
+                        recentInList.length + commonInList.length + startIdx + idx,
+                        false
                       )
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-medium text-zinc-700 mb-1", children: "Loading icons..." }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-muted-foreground", children: "Please wait while we fetch the icon library" })
-                ] }),
-                !manifestLoading && list.length === 0 && !debouncedQuery && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-16 text-center", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "svg",
+                    ) }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: Math.max(0, (totalRows - endRow) * rowHeight) } })
+                  ]
+                }
+              )
+            ] }),
+            manifestLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-16 text-center", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "svg",
+                {
+                  className: "w-16 h-16 mx-auto text-zinc-300 mb-4 animate-pulse",
+                  fill: "none",
+                  stroke: "currentColor",
+                  viewBox: "0 0 24 24",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "path",
                     {
-                      className: "w-16 h-16 mx-auto text-zinc-300 mb-4",
-                      fill: "none",
-                      stroke: "currentColor",
-                      viewBox: "0 0 24 24",
-                      children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-                        "path",
-                        {
-                          strokeLinecap: "round",
-                          strokeLinejoin: "round",
-                          strokeWidth: "1.5",
-                          d: "M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                        }
-                      )
+                      strokeLinecap: "round",
+                      strokeLinejoin: "round",
+                      strokeWidth: "1.5",
+                      d: "M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                     }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-medium text-zinc-700 mb-1", children: "No icons available" }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-muted-foreground", children: "Unable to load icons from the icon library" })
-                ] }),
-                debouncedQuery && list.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-16 text-center", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "svg",
+                  )
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-medium text-zinc-700 mb-1", children: "Loading icons..." }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-muted-foreground", children: "Please wait while we fetch the icon library" })
+            ] }),
+            !manifestLoading && list.length === 0 && !debouncedQuery && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-16 text-center", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "svg",
+                {
+                  className: "w-16 h-16 mx-auto text-zinc-300 mb-4",
+                  fill: "none",
+                  stroke: "currentColor",
+                  viewBox: "0 0 24 24",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "path",
                     {
-                      className: "w-16 h-16 mx-auto text-zinc-300 mb-4",
-                      fill: "none",
-                      stroke: "currentColor",
-                      viewBox: "0 0 24 24",
-                      children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-                        "path",
-                        {
-                          strokeLinecap: "round",
-                          strokeLinejoin: "round",
-                          strokeWidth: "1.5",
-                          d: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        }
-                      )
+                      strokeLinecap: "round",
+                      strokeLinejoin: "round",
+                      strokeWidth: "1.5",
+                      d: "M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                     }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-medium text-zinc-700 mb-1", children: "No icons found" }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs text-muted-foreground", children: [
-                    "Try a different search term or",
-                    " ",
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(
-                      "button",
-                      {
-                        type: "button",
-                        onClick: () => setQuery(""),
-                        className: "text-primary hover:underline",
-                        children: "clear your search"
-                      }
-                    )
-                  ] })
-                ] })
-              ]
-            }
-          ),
+                  )
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-medium text-zinc-700 mb-1", children: "No icons available" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-muted-foreground", children: "Unable to load icons from the icon library" })
+            ] }),
+            debouncedQuery && list.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-16 text-center", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "svg",
+                {
+                  className: "w-16 h-16 mx-auto text-zinc-300 mb-4",
+                  fill: "none",
+                  stroke: "currentColor",
+                  viewBox: "0 0 24 24",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "path",
+                    {
+                      strokeLinecap: "round",
+                      strokeLinejoin: "round",
+                      strokeWidth: "1.5",
+                      d: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    }
+                  )
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-medium text-zinc-700 mb-1", children: "No icons found" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs text-muted-foreground", children: [
+                "Try a different search term or",
+                " ",
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => setQuery(""),
+                    className: "text-primary hover:underline",
+                    children: "clear your search"
+                  }
+                )
+              ] })
+            ] })
+          ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-t mt-4 pt-4 px-2 text-xs text-muted-foreground text-center space-y-2", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
               "You are using ",

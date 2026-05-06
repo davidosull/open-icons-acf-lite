@@ -1,31 +1,31 @@
 {
   "_select-menu-!~{003}~.js": {
-    "file": "select-menu-D5JEtbmt.css",
+    "file": "select-menu-Bxs1j0hC.css",
     "src": "_select-menu-!~{003}~.js"
   },
-  "_select-menu-DPXFltX0.js": {
-    "file": "select-menu-DPXFltX0.js",
+  "_select-menu-DNLcjW-n.js": {
+    "file": "select-menu-DNLcjW-n.js",
     "name": "select-menu",
     "css": [
-      "select-menu-D5JEtbmt.css"
+      "select-menu-Bxs1j0hC.css"
     ]
   },
   "src/picker.tsx": {
-    "file": "picker-C1xoGBb7.js",
+    "file": "picker-e8gRQqAu.js",
     "name": "picker",
     "src": "src/picker.tsx",
     "isEntry": true,
     "imports": [
-      "_select-menu-DPXFltX0.js"
+      "_select-menu-DNLcjW-n.js"
     ]
   },
   "src/settings.tsx": {
-    "file": "settings-BylxllX7.js",
+    "file": "settings-UxoeR_jc.js",
     "name": "settings",
     "src": "src/settings.tsx",
     "isEntry": true,
     "imports": [
-      "_select-menu-DPXFltX0.js"
+      "_select-menu-DNLcjW-n.js"
     ]
   }
 }
